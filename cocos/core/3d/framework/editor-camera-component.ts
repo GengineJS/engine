@@ -8,6 +8,7 @@ import { toRadian } from '../../math';
 import { Camera } from '../../renderer';
 import { CameraComponent } from './camera-component';
 import { CAMERA_EDITOR_MASK } from '../../pipeline/define';
+import { legacyCC } from '../../global-exports';
 
 @ccclass('cc.EditorCameraComponent')
 export class EditorCameraComponent extends CameraComponent {
@@ -15,7 +16,6 @@ export class EditorCameraComponent extends CameraComponent {
     private _uiEditorCamera: Camera | null = null;
 
     set projection (val) {
-        // @ts-ignore
         super.projection = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.projectionType = val;
@@ -23,7 +23,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set fov (val) {
-        // @ts-ignore
         super.fov = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.fov = toRadian(val);
@@ -31,7 +30,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set orthoHeight (val) {
-        // @ts-ignore
         super.orthoHeight = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.orthoHeight = val;
@@ -39,7 +37,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set near (val) {
-        // @ts-ignore
         super.near = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.nearClip = val;
@@ -47,7 +44,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set far (val) {
-        // @ts-ignore
         super.far = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.farClip = val;
@@ -55,7 +51,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set clearColor (val) {
-        // @ts-ignore
         super.clearColor = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.clearColor = val;
@@ -63,7 +58,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set clearDepth (val) {
-        // @ts-ignore
         super.clearDepth = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.clearDepth = val;
@@ -71,7 +65,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set clearStencil (val) {
-        // @ts-ignore
         super.clearStencil = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.clearStencil = val;
@@ -79,7 +72,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set clearFlags (val) {
-        // @ts-ignore
         super.clearFlags = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.clearFlag = val;
@@ -87,7 +79,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set rect (val) {
-        // @ts-ignore
         super.rect = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.viewport = val;
@@ -95,7 +86,6 @@ export class EditorCameraComponent extends CameraComponent {
     }
 
     set screenScale (val) {
-        // @ts-ignore
         super.screenScale = val;
         if (this._uiEditorCamera) {
             this._uiEditorCamera.screenScale = val;
@@ -111,7 +101,7 @@ export class EditorCameraComponent extends CameraComponent {
     public onEnable () {
         super.onEnable();
         if (this._uiEditorCamera) {
-            cc.director.root!.ui.renderScene.addCamera(this._uiEditorCamera);
+            legacyCC.director.root!.ui.renderScene.addCamera(this._uiEditorCamera);
             this._uiEditorCamera.enabled = true;
         }
     }
@@ -119,14 +109,14 @@ export class EditorCameraComponent extends CameraComponent {
     public onDisable () {
         super.onDisable();
         if (this._uiEditorCamera) {
-            cc.director.root!.ui.renderScene.removeCamera(this._uiEditorCamera);
+            legacyCC.director.root!.ui.renderScene.removeCamera(this._uiEditorCamera);
         }
     }
 
     public onDestroy () {
         super.onDestroy();
         if (this._uiEditorCamera) {
-            cc.director.root!.destroyCamera(this._uiEditorCamera);
+            legacyCC.director.root!.destroyCamera(this._uiEditorCamera);
             this._uiEditorCamera = null;
         }
     }
@@ -137,15 +127,15 @@ export class EditorCameraComponent extends CameraComponent {
 
         if (this._camera !== priorCamera && this._camera) {
             if (this._uiEditorCamera) {
-                cc.director.root!.destroyCamera(this._uiEditorCamera);
+                legacyCC.director.root!.destroyCamera(this._uiEditorCamera);
                 this._uiEditorCamera = null;
             }
-            this._uiEditorCamera = cc.director.root!.createCamera();
+            this._uiEditorCamera = legacyCC.director.root!.createCamera();
             this._uiEditorCamera!.initialize({
                 name: 'Editor UICamera',
                 node: this._camera.node,
                 projection: this._projection,
-                window: cc.director.root!.mainWindow,
+                window: legacyCC.director.root!.mainWindow,
                 priority: this._priority + 1,
                 flows: ['UIFlow'],
             });

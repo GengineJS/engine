@@ -39,6 +39,7 @@ import { IAssembler } from '../../core/renderer/ui/base';
 import { UI } from '../../core/renderer/ui/ui';
 import { LineCap, LineJoin } from '../assembler/graphics/types';
 import { Impl } from '../assembler/graphics/webgl/impl';
+import { legacyCC } from '../../core/global-exports';
 
 const _matInsInfo: IMaterialInstanceInfo = {
     parent: null!,
@@ -230,7 +231,7 @@ export class GraphicsComponent extends UIRenderComponent {
 
     constructor (){
         super();
-        this._instanceMaterialType = InstanceMaterialType.ADDCOLOR;
+        this._instanceMaterialType = InstanceMaterialType.ADD_COLOR;
     }
 
     public onRestore () {
@@ -617,4 +618,4 @@ export class GraphicsComponent extends UIRenderComponent {
     }
 }
 
-cc.GraphicsComponent = GraphicsComponent;
+legacyCC.GraphicsComponent = GraphicsComponent;
