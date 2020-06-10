@@ -582,8 +582,8 @@ export class SpriteFrame extends Asset {
         this.offset = offset;
     }
 
-    public getGFXTextureView () {
-        return this._texture.getGFXTextureView();
+    public getGFXTexture () {
+        return this._texture.getGFXTexture();
     }
 
     public getGFXSampler () {
@@ -652,7 +652,8 @@ export class SpriteFrame extends Asset {
             }
             // hack
             if (this._texture instanceof RenderTexture) {
-                this._flipUv = true;
+                // no need to flip render target texcoord on metal and vulkan.
+                this._flipUv = cc.director.root.device.projectionSignY < 0 ? false : true;
             }
 
             calUV = true;

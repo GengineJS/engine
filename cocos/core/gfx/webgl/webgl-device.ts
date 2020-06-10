@@ -12,7 +12,6 @@ import {
     GFXFilter,
     GFXFormat,
     GFXFormatInfos,
-    GFXFormatSize,
     GFXQueueType,
     GFXTextureFlagBit,
     GFXTextureType,
@@ -20,6 +19,7 @@ import {
     IGFXRect,
 } from '../define';
 import { GFXAPI, GFXDevice, GFXFeature, IGFXDeviceInfo } from '../device';
+import { GFXFence, IGFXFenceInfo } from '../fence';
 import { GFXFramebuffer, IGFXFramebufferInfo } from '../framebuffer';
 import { GFXInputAssembler, IGFXInputAssemblerInfo } from '../input-assembler';
 import { GFXPipelineLayout, IGFXPipelineLayoutInfo } from '../pipeline-layout';
@@ -28,14 +28,14 @@ import { GFXQueue, IGFXQueueInfo } from '../queue';
 import { GFXRenderPass, IGFXRenderPassInfo } from '../render-pass';
 import { GFXSampler, IGFXSamplerInfo } from '../sampler';
 import { GFXShader, IGFXShaderInfo } from '../shader';
-import { GFXTexture, IGFXTextureInfo } from '../texture';
-import { GFXTextureView, IGFXTextureViewInfo } from '../texture-view';
+import { GFXTexture, IGFXTextureInfo, IGFXTextureViewInfo } from '../texture';
 import { GFXWindow, IGFXWindowInfo } from '../window';
 import { WebGLGFXBindingLayout } from './webgl-binding-layout';
 import { WebGLGFXBuffer } from './webgl-buffer';
 import { WebGLGFXCommandAllocator } from './webgl-command-allocator';
 import { WebGLGFXCommandBuffer } from './webgl-command-buffer';
 import { GFXFormatToWebGLFormat, GFXFormatToWebGLType, WebGLCmdFuncCopyBuffersToTexture, WebGLCmdFuncCopyTexImagesToTexture } from './webgl-commands';
+import { WebGLGFXFence } from './webgl-fence';
 import { WebGLGFXFramebuffer } from './webgl-framebuffer';
 import { WebGLGFXInputAssembler } from './webgl-input-assembler';
 import { WebGLGFXPipelineLayout } from './webgl-pipeline-layout';
@@ -47,7 +47,6 @@ import { WebGLGFXSampler } from './webgl-sampler';
 import { WebGLGFXShader } from './webgl-shader';
 import { WebGLStateCache } from './webgl-state-cache';
 import { WebGLGFXTexture } from './webgl-texture';
-import { WebGLGFXTextureView } from './webgl-texture-view';
 import { WebGLGFXWindow } from './webgl-window';
 
 export class WebGLGFXDevice extends GFXDevice {
@@ -476,7 +475,6 @@ export class WebGLGFXDevice extends GFXDevice {
         });
 
         const nullTexRegion: GFXBufferTextureCopy = {
-            buffOffset: 0,
             buffStride: 0,
             buffTexHeight: 0,
             texOffset: {
@@ -490,8 +488,7 @@ export class WebGLGFXDevice extends GFXDevice {
                 depth: 1,
             },
             texSubres: {
-                baseMipLevel: 0,
-                levelCount: 1,
+                mipLevel: 0,
                 baseArrayLayer: 0,
                 layerCount: 1,
             },
@@ -555,16 +552,10 @@ export class WebGLGFXDevice extends GFXDevice {
         return buffer;
     }
 
-    public createTexture (info: IGFXTextureInfo): GFXTexture {
+    public createTexture (info: IGFXTextureInfo | IGFXTextureViewInfo): GFXTexture {
         const texture = new WebGLGFXTexture(this);
         texture.initialize(info);
         return texture;
-    }
-
-    public createTextureView (info: IGFXTextureViewInfo): GFXTextureView {
-        const texView = new WebGLGFXTextureView(this);
-        texView.initialize(info);
-        return texView;
     }
 
     public createSampler (info: IGFXSamplerInfo): GFXSampler {
@@ -629,6 +620,12 @@ export class WebGLGFXDevice extends GFXDevice {
         return cmdBuff;
     }
 
+    public createFence (info: IGFXFenceInfo): GFXFence {
+        const fence = new WebGLGFXFence(this);
+        fence.initialize(info);
+        return fence;
+    }
+
     public createQueue (info: IGFXQueueInfo): GFXQueue {
         const queue = new WebGLGFXQueue(this);
         queue.initialize(info);
@@ -640,6 +637,8 @@ export class WebGLGFXDevice extends GFXDevice {
         window.initialize(info);
         return window;
     }
+
+    public acquire () {}
 
     public present () {
         (this._cmdAllocator as WebGLGFXCommandAllocator).releaseCmds();
@@ -677,7 +676,7 @@ export class WebGLGFXDevice extends GFXDevice {
 
         const gl = this._webGLRC!;
         const gpuFramebuffer = (srcFramebuffer as WebGLGFXFramebuffer).gpuFramebuffer;
-        const format = gpuFramebuffer.gpuColorViews[0].format;
+        const format = gpuFramebuffer.gpuColorTextures[0].format;
         const glFormat = GFXFormatToWebGLFormat(format, gl);
         const glType = GFXFormatToWebGLType(format, gl);
         const ctor = getTypedArrayConstructor(GFXFormatInfos[format]);
@@ -692,15 +691,11 @@ export class WebGLGFXDevice extends GFXDevice {
         const view = new ctor(dstBuffer);
 
         for (const region of regions) {
-            const buffOffset = region.buffOffset + region.buffTexHeight * region.buffStride;
 
             const w = region.texExtent.width;
             const h = region.texExtent.height;
 
-            const memSize = GFXFormatSize(format, w, h, 1);
-            const data = view.subarray(buffOffset, buffOffset + memSize);
-
-            gl.readPixels(region.texOffset.x, region.texOffset.y, w, h, glFormat, glType, data);
+            gl.readPixels(region.texOffset.x, region.texOffset.y, w, h, glFormat, glType, view);
         }
 
         if (this.stateCache.glFramebuffer !== curFBO) {

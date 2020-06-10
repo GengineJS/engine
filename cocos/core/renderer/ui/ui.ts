@@ -34,7 +34,7 @@ import { GFXCommandBufferType } from '../../gfx/define';
 import { GFXDevice } from '../../gfx/device';
 import { IGFXAttribute } from '../../gfx/input-assembler';
 import { GFXSampler } from '../../gfx/sampler';
-import { GFXTextureView } from '../../gfx/texture-view';
+import { GFXTexture } from '../../gfx/texture';
 import { Pool, RecyclePool } from '../../memop';
 import { CachedArray } from '../../memop/cached-array';
 import { UniformBinding } from '../../pipeline/define';
@@ -98,7 +98,7 @@ export class UI {
     // batcher
     private _emptyMaterial = new Material();
     private _currMaterial: Material = this._emptyMaterial;
-    private _currTexView: GFXTextureView | null = null;
+    private _currTexture: GFXTexture | null = null;
     private _currSampler: GFXSampler | null = null;
     private _currCanvas: CanvasComponent | null = null;
     private _currMeshBuffer: MeshBuffer | null = null;
@@ -333,16 +333,12 @@ export class UI {
                 } else {
                     const bindingLayout = batch.bindingLayout!;
                     // assumes sprite materials has only one sampler
-                    bindingLayout.bindTextureView(UniformBinding.CUSTOM_SAMPLER_BINDING_START_POINT, batch.texView!);
+                    bindingLayout.bindTexture(UniformBinding.CUSTOM_SAMPLER_BINDING_START_POINT, batch.texture!);
                     bindingLayout.bindSampler(UniformBinding.CUSTOM_SAMPLER_BINDING_START_POINT, batch.sampler!);
                     bindingLayout.update();
 
-                    const ia = batch.bufferBatch!.ia!;
-                    ia.firstIndex = batch.firstIdx;
-                    ia.indexCount = batch.idxCount;
-
                     const uiModel = this._uiModelPool!.alloc();
-                    uiModel.directInitialize(ia, batch);
+                    uiModel.directInitialize(batch.ia!, batch);
                     this._scene.addModel(uiModel);
                     uiModel.getSubModel(0).priority = batchPriority++;
                     if (batch.camera) {
@@ -372,17 +368,17 @@ export class UI {
      * @param frame - 当前执行组件贴图。
      * @param assembler - 当前组件渲染数据组装器。
      */
-    public commitComp (comp: UIRenderComponent, frame: GFXTextureView | null = null, assembler: any, sampler: GFXSampler | null = null) {
+    public commitComp (comp: UIRenderComponent, frame: GFXTexture | null = null, assembler: any, sampler: GFXSampler | null = null) {
         const renderComp = comp;
-        const texView = frame;
+        const texture = frame;
         const samp = sampler;
 
         if (this._currMaterial.hash !== renderComp.material!.hash ||
-            this._currTexView !== texView || this._currSampler !== samp
+            this._currTexture !== texture || this._currSampler !== samp
         ) {
             this.autoMergeBatches();
             this._currMaterial = renderComp.material!;
-            this._currTexView = texView;
+            this._currTexture = texture;
             this._currSampler = samp;
         }
 
@@ -426,17 +422,15 @@ export class UI {
         curDrawBatch.model = model;
         curDrawBatch.bufferBatch = null;
         curDrawBatch.material = mat;
-        curDrawBatch.texView = null;
+        curDrawBatch.texture = null;
         curDrawBatch.sampler = null;
-        curDrawBatch.firstIdx = 0;
-        curDrawBatch.idxCount = 0;
 
-        curDrawBatch.pipelineState = null;
+        curDrawBatch.psoCreateInfo = null;
         curDrawBatch.bindingLayout = null;
 
         // reset current render state to null
         this._currMaterial = this._emptyMaterial;
-        this._currTexView = null;
+        this._currTexture = null;
         this._currSampler = null;
 
         this._batches.push(curDrawBatch);
@@ -480,13 +474,13 @@ export class UI {
         curDrawBatch.camera = uiCanvas && uiCanvas.camera;
         curDrawBatch.bufferBatch = buffer;
         curDrawBatch.material = mat;
-        curDrawBatch.texView = this._currTexView!;
+        curDrawBatch.texture = this._currTexture!;
         curDrawBatch.sampler = this._currSampler;
-        curDrawBatch.firstIdx = indicsStart;
-        curDrawBatch.idxCount = vCount;
+        curDrawBatch.ia!.firstIndex = indicsStart;
+        curDrawBatch.ia!.indexCount = vCount;
 
-        curDrawBatch.pipelineState = this._getUIMaterial(mat).getPipelineState();
-        curDrawBatch.bindingLayout = curDrawBatch.pipelineState!.pipelineLayout.layouts[0];
+        curDrawBatch.psoCreateInfo = this._getUIMaterial(mat).getPipelineCreateInfo();
+        curDrawBatch.bindingLayout = curDrawBatch.psoCreateInfo!.bindingLayout;
 
         this._batches.push(curDrawBatch);
 
@@ -505,9 +499,9 @@ export class UI {
      * @param material - 当前批次的材质。
      * @param sprite - 当前批次的精灵帧。
      */
-    public forceMergeBatches (material: Material, sprite: GFXTextureView | null) {
+    public forceMergeBatches (material: Material, sprite: GFXTexture | null) {
         this._currMaterial = material;
-        this._currTexView = sprite;
+        this._currTexture = sprite;
         this.autoMergeBatches();
     }
 
@@ -521,7 +515,7 @@ export class UI {
     public finishMergeBatches () {
         this.autoMergeBatches();
         this._currMaterial = this._emptyMaterial;
-        this._currTexView = null;
+        this._currTexture = null;
     }
 
     private _destroyUIMaterials () {
@@ -609,7 +603,7 @@ export class UI {
         this._batches.clear();
         this._currMaterial = this._emptyMaterial;
         this._currCanvas = null;
-        this._currTexView = null;
+        this._currTexture = null;
         this._currSampler = null;
         this._meshBufferUseCount = 0;
         this._requireBufferBatch();

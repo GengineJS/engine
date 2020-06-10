@@ -33,17 +33,18 @@ import { Skeleton } from '../../assets/skeleton';
 import { aabb } from '../../geometry';
 import { GFXBuffer } from '../../gfx/buffer';
 import { GFXBufferUsageBit, GFXMemoryUsageBit } from '../../gfx/define';
-import { GFXPipelineState } from '../../gfx/pipeline-state';
 import { Vec3 } from '../../math';
 import { INST_JOINT_ANIM_INFO, UBOSkinningAnimation, UBOSkinningTexture, UniformJointTexture } from '../../pipeline/define';
 import { Node } from '../../scene-graph';
-import { Pass, IMacroPatch } from '../core/pass';
+import { Pass } from '../core/pass';
 import { samplerLib } from '../core/sampler-lib';
 import { DataPoolManager } from '../data-pool-manager';
 import { ModelType } from '../scene/model';
 import { IAnimInfo, IJointTextureHandle, jointTextureSamplerHash } from './skeletal-animation-utils';
 import { MorphModel } from './morph-model';
+import { IPSOCreateInfo } from '../scene/submodel';
 import { legacyCC } from '../../global-exports';
+import { IGFXAttribute } from '../../gfx';
 
 interface IJointsInfo {
     buffer: GFXBuffer | null;
@@ -173,39 +174,42 @@ export class BakedSkinningModel extends MorphModel {
         jointTextureInfo[3] = 1 / jointTextureInfo[0];
         this.updateInstancedJointTextureInfo();
         if (buffer) { buffer.update(jointTextureInfo); }
-        const tv = texture.handle.texView;
-        const it = this._matPSORecord.values(); let res = it.next();
-        while (!res.done) {
-            const psos = res.value;
-            for (let i = 0; i < psos.length; i++) {
-                const bindingLayout = psos[i].pipelineLayout.layouts[0];
-                bindingLayout.bindTextureView(UniformJointTexture.binding, tv);
+        const tex = texture.handle.texture;
+
+        for (let i = 0; i < this._subModels.length; ++i) {
+            const psoCreateInfos = this._subModels[i].psoInfos;
+            for (let j = 0; j < psoCreateInfos.length; ++j) {
+                const bindingLayout = psoCreateInfos[j].bindingLayout;
+                bindingLayout.bindTexture(UniformJointTexture.binding, tex);
             }
-            res = it.next();
         }
-        for (let i = 0; i < this._implantPSOs.length; i++) {
-            const bindingLayout = this._implantPSOs[i].pipelineLayout.layouts[0];
-            bindingLayout.bindTextureView(UniformJointTexture.binding, tv);
+
+        for (let i = 0; i < this._implantPSOCIs.length; i++) {
+            const bindingLayout = this._implantPSOCIs[i].bindingLayout;
+            bindingLayout.bindTexture(UniformJointTexture.binding, tex);
             bindingLayout.update();
         }
     }
 
-    protected createPipelineState (pass: Pass, subModelIdx: number, patches?: IMacroPatch[]) {
-        const pso = super.createPipelineState(pass, subModelIdx, patches?.concat(myPatches) ?? myPatches);
+    public getMacroPatches (subModelIndex: number) : any {
+        return myPatches;
+    }
+
+    public updateLocalBindings (psoci: IPSOCreateInfo, submodelIdx: number) {
+        super.updateLocalBindings(psoci, submodelIdx);
         const { buffer, texture, animInfo } = this._jointsMedium;
-        const bindingLayout = pso.pipelineLayout.layouts[0];
+        const bindingLayout = psoci.bindingLayout;
         bindingLayout.bindBuffer(UBOSkinningTexture.BLOCK.binding, buffer!);
         bindingLayout.bindBuffer(UBOSkinningAnimation.BLOCK.binding, animInfo.buffer);
         const sampler = samplerLib.getSampler(this._device, jointTextureSamplerHash);
         if (texture) {
-            bindingLayout.bindTextureView(UniformJointTexture.binding, texture.handle.texView);
+            bindingLayout.bindTexture(UniformJointTexture.binding, texture.handle.texture);
             bindingLayout.bindSampler(UniformJointTexture.binding, sampler);
         }
-        return pso;
     }
 
-    protected updateInstancedAttributeList (pso: GFXPipelineState, pass: Pass) {
-        super.updateInstancedAttributeList(pso, pass);
+    protected updateInstancedAttributeList (attributes: IGFXAttribute[], pass: Pass) {
+        super.updateInstancedAttributeList(attributes, pass);
         this._instAnimInfoIdx = this.getInstancedAttributeIndex(INST_JOINT_ANIM_INFO);
         this.updateInstancedJointTextureInfo();
     }

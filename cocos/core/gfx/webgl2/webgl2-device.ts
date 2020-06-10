@@ -10,7 +10,6 @@ import {
     GFXFilter,
     GFXFormat,
     GFXFormatInfos,
-    GFXFormatSize,
     GFXQueueType,
     GFXTextureFlagBit,
     GFXTextureType,
@@ -18,6 +17,7 @@ import {
     IGFXRect,
 } from '../define';
 import { GFXAPI, GFXDevice, GFXFeature, IGFXDeviceInfo } from '../device';
+import { GFXFence, IGFXFenceInfo } from '../fence';
 import { GFXFramebuffer, IGFXFramebufferInfo } from '../framebuffer';
 import { GFXInputAssembler, IGFXInputAssemblerInfo } from '../input-assembler';
 import { GFXPipelineLayout, IGFXPipelineLayoutInfo } from '../pipeline-layout';
@@ -26,8 +26,7 @@ import { GFXQueue, IGFXQueueInfo } from '../queue';
 import { GFXRenderPass, IGFXRenderPassInfo } from '../render-pass';
 import { GFXSampler, IGFXSamplerInfo } from '../sampler';
 import { GFXShader, IGFXShaderInfo } from '../shader';
-import { GFXTexture, IGFXTextureInfo } from '../texture';
-import { GFXTextureView, IGFXTextureViewInfo } from '../texture-view';
+import { GFXTexture, IGFXTextureInfo, IGFXTextureViewInfo } from '../texture';
 import { GFXWindow, IGFXWindowInfo } from '../window';
 import { WebGL2GFXBindingLayout } from './webgl2-binding-layout';
 import { WebGL2GFXBuffer } from './webgl2-buffer';
@@ -37,6 +36,7 @@ import {
     GFXFormatToWebGLFormat, GFXFormatToWebGLType, WebGL2CmdFuncBlitFramebuffer,
     WebGL2CmdFuncCopyBuffersToTexture, WebGL2CmdFuncCopyTexImagesToTexture,
 } from './webgl2-commands';
+import { WebGL2GFXFence } from './webgl2-fence';
 import { WebGL2GFXFramebuffer } from './webgl2-framebuffer';
 import { WebGL2GFXInputAssembler } from './webgl2-input-assembler';
 import { WebGL2GFXPipelineLayout } from './webgl2-pipeline-layout';
@@ -48,7 +48,6 @@ import { WebGL2GFXSampler } from './webgl2-sampler';
 import { WebGL2GFXShader } from './webgl2-shader';
 import { WebGL2StateCache } from './webgl2-state-cache';
 import { WebGL2GFXTexture } from './webgl2-texture';
-import { WebGL2GFXTextureView } from './webgl2-texture-view';
 import { WebGL2GFXWindow } from './webgl2-window';
 
 export class WebGL2GFXDevice extends GFXDevice {
@@ -366,7 +365,6 @@ export class WebGL2GFXDevice extends GFXDevice {
         });
 
         const nullTexRegion: GFXBufferTextureCopy = {
-            buffOffset: 0,
             buffStride: 0,
             buffTexHeight: 0,
             texOffset: {
@@ -380,8 +378,7 @@ export class WebGL2GFXDevice extends GFXDevice {
                 depth: 1,
             },
             texSubres: {
-                baseMipLevel: 0,
-                levelCount: 1,
+                mipLevel: 0,
                 baseArrayLayer: 0,
                 layerCount: 1,
             },
@@ -445,16 +442,10 @@ export class WebGL2GFXDevice extends GFXDevice {
         return buffer;
     }
 
-    public createTexture (info: IGFXTextureInfo): GFXTexture {
+    public createTexture (info: IGFXTextureInfo | IGFXTextureViewInfo): GFXTexture {
         const texture = new WebGL2GFXTexture(this);
         texture.initialize(info);
         return texture;
-    }
-
-    public createTextureView (info: IGFXTextureViewInfo): GFXTextureView {
-        const texView = new WebGL2GFXTextureView(this);
-        texView.initialize(info);
-        return texView;
     }
 
     public createSampler (info: IGFXSamplerInfo): GFXSampler {
@@ -519,6 +510,12 @@ export class WebGL2GFXDevice extends GFXDevice {
         return cmdBuff;
     }
 
+    public createFence (info: IGFXFenceInfo): GFXFence {
+        const fence = new WebGL2GFXFence(this);
+        fence.initialize(info);
+        return fence;
+    }
+
     public createQueue (info: IGFXQueueInfo): GFXQueue {
         const queue = new WebGL2GFXQueue(this);
         queue.initialize(info);
@@ -530,6 +527,8 @@ export class WebGL2GFXDevice extends GFXDevice {
         window.initialize(info);
         return window;
     }
+
+    public acquire () {}
 
     public present () {
         (this._cmdAllocator as WebGL2GFXCommandAllocator).releaseCmds();
@@ -567,7 +566,7 @@ export class WebGL2GFXDevice extends GFXDevice {
 
         const gl = this._webGL2RC!;
         const gpuFramebuffer = (srcFramebuffer as WebGL2GFXFramebuffer).gpuFramebuffer;
-        const format = gpuFramebuffer.gpuColorViews[0].format;
+        const format = gpuFramebuffer.gpuColorTextures[0].format;
         const glFormat = GFXFormatToWebGLFormat(format, gl);
         const glType = GFXFormatToWebGLType(format, gl);
         const ctor = getTypedArrayConstructor(GFXFormatInfos[format]);
@@ -582,15 +581,11 @@ export class WebGL2GFXDevice extends GFXDevice {
         const view = new ctor(dstBuffer);
 
         for (const region of regions) {
-            const buffOffset = region.buffOffset + region.buffTexHeight * region.buffStride;
 
             const w = region.texExtent.width;
             const h = region.texExtent.height;
 
-            const memSize = GFXFormatSize(format, w, h, 1);
-            const data = view.subarray(buffOffset, buffOffset + memSize);
-
-            gl.readPixels(region.texOffset.x, region.texOffset.y, w, h, glFormat, glType, data);
+            gl.readPixels(region.texOffset.x, region.texOffset.y, w, h, glFormat, glType, view);
         }
 
         if (this.stateCache.glFramebuffer !== curFBO) {

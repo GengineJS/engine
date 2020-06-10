@@ -6,20 +6,18 @@ import { aabb } from '../../geometry';
 import { GFXBuffer } from '../../gfx/buffer';
 import { getTypedArrayConstructor, GFXBufferUsageBit, GFXFormat, GFXFormatInfos, GFXMemoryUsageBit, GFXFilter, GFXAddress } from '../../gfx/define';
 import { GFXDevice, GFXFeature } from '../../gfx/device';
-import { GFXPipelineState } from '../../gfx/pipeline-state';
 import { Mat4, Vec3, Vec4 } from '../../math';
 import { Pool } from '../../memop';
-import { INST_MAT_WORLD, UBOForwardLight, UBOLocal, UniformBinding, UniformLightingMapSampler } from '../../pipeline/define';
+import { UBOLocal, UniformLightingMapSampler, INST_MAT_WORLD } from '../../pipeline/define';
 import { Node } from '../../scene-graph';
 import { Layers } from '../../scene-graph/layers';
-import { IMacroPatch, Pass } from '../core/pass';
 import { RenderScene } from './render-scene';
-import { SubModel } from './submodel';
-import { legacyCC } from '../../global-exports';
 import { Texture2D } from '../..';
 import { genSamplerHash, samplerLib } from '../../renderer/core/sampler-lib';
-import { GFXSampler } from '../../gfx';
-import { programLib } from '../core/program-lib';
+import { IGFXAttribute } from '../../gfx';
+import { SubModel, IPSOCreateInfo } from './submodel';
+import { Pass, IMacroPatch } from '../core/pass';
+import { legacyCC } from '../../global-exports';
 
 const m4_1 = new Mat4();
 
@@ -52,6 +50,24 @@ function uploadMat4AsVec4x3 (mat: Mat4, v1: ArrayBufferView, v2: ArrayBufferView
     v2[0] = mat.m04; v2[1] = mat.m05; v2[2] = mat.m06; v2[3] = mat.m13;
     v3[0] = mat.m08; v3[1] = mat.m09; v3[2] = mat.m10; v3[3] = mat.m14;
 }
+
+const lightmapSamplerHash = genSamplerHash([
+    GFXFilter.LINEAR,
+    GFXFilter.LINEAR,
+    GFXFilter.NONE,
+    GFXAddress.CLAMP,
+    GFXAddress.CLAMP,
+    GFXAddress.CLAMP,
+]);
+
+const lightmapSamplerWithMipHash = genSamplerHash([
+    GFXFilter.LINEAR,
+    GFXFilter.LINEAR,
+    GFXFilter.LINEAR,
+    GFXAddress.CLAMP,
+    GFXAddress.CLAMP,
+    GFXAddress.CLAMP,
+]);
 
 /**
  * A representation of a model
@@ -104,12 +120,9 @@ export class Model {
     protected _worldBounds: aabb | null = null;
     protected _modelBounds: aabb | null = null;
     protected _subModels: SubModel[] = [];
-    protected _implantPSOs: GFXPipelineState[] = [];
-    protected _matPSORecord = new Map<Material, GFXPipelineState[]>();
-    protected _matRefCount = new Map<Material, number>();
+    protected _implantPSOCIs: IPSOCreateInfo[] = [];
     protected _localData = new Float32Array(UBOLocal.COUNT);
     protected _localBuffer: GFXBuffer | null = null;
-    //protected _lightBuffer: GFXBuffer | null = null;
     protected _inited = false;
     protected _updateStamp = -1;
     protected _transformUpdated = true;
@@ -139,8 +152,6 @@ export class Model {
         this._worldBounds = null;
         this._modelBounds = null;
         this._subModels.length = 0;
-        this._matPSORecord.clear();
-        this._matRefCount.clear();
         this._inited = false;
         this._transformUpdated = true;
         this.isDynamicBatching = false;
@@ -171,57 +182,28 @@ export class Model {
         }
     }
 
-    public updateLightingmap (tex: Texture2D|null, uvParam: Vec4) {
+    public updateLightingmap (texture: Texture2D | null, uvParam: Vec4) {
         Vec4.toArray(this._localData, uvParam, UBOLocal.LIGHTINGMAP_UVPARAM);
 
-        if (tex === null) {
-            tex = builtinResMgr.get<Texture2D>('empty-texture');
+        if (texture === null) {
+            texture = builtinResMgr.get<Texture2D>('empty-texture');
         }
 
-        const texture = tex;
-        const textureView = texture.getGFXTextureView();
-
-        if (textureView !== null) {
-            let sampler: GFXSampler;
-            if (tex.mipmaps.length > 1) {
-                const samplerHash = genSamplerHash([
-                    GFXFilter.LINEAR,
-                    GFXFilter.LINEAR,
-                    GFXFilter.LINEAR,
-                    GFXAddress.CLAMP,
-                    GFXAddress.CLAMP,
-                    GFXAddress.CLAMP,
-                ]);
-                sampler = samplerLib.getSampler(this._device, samplerHash);
-            }
-            else {
-                const samplerHash = genSamplerHash([
-                    GFXFilter.NONE,
-                    GFXFilter.NONE,
-                    GFXFilter.NONE,
-                    GFXAddress.CLAMP,
-                    GFXAddress.CLAMP,
-                    GFXAddress.CLAMP,
-                ]);
-                sampler = samplerLib.getSampler(this._device, samplerHash);
-            }
-
+        const gfxTexture = texture.getGFXTexture();
+        if (gfxTexture !== null) {
+            const sampler = samplerLib.getSampler(this._device, texture.mipmaps.length > 1 ? lightmapSamplerWithMipHash : lightmapSamplerHash);
             for (const sub of this._subModels) {
-                if (sub.psos === null) {
-                    continue;
-                }
-
-                for (let i = 0; i < sub.psos.length; i++) {
-                    sub.psos[i].pipelineLayout.layouts[0].bindTextureView(UniformLightingMapSampler.binding, textureView);
-                    sub.psos[i].pipelineLayout.layouts[0].bindSampler(UniformLightingMapSampler.binding, sampler);
-                    sub.psos[i].pipelineLayout.layouts[0].update();
+                for (let i = 0; i < sub.psoInfos.length; i++) {
+                    sub.psoInfos[i].bindingLayout.bindTexture(UniformLightingMapSampler.binding, gfxTexture);
+                    sub.psoInfos[i].bindingLayout.bindSampler(UniformLightingMapSampler.binding, sampler);
+                    sub.psoInfos[i].bindingLayout.update();
                 }
             }
         }
     }
 
     public updateUBOs (stamp: number) {
-        this._matPSORecord.forEach(this._updatePass, this);
+        this._subModels.forEach(this._updatePass, this);
         this._updateStamp = stamp;
         if (!this._transformUpdated) { return; }
         this._transformUpdated = false;
@@ -255,12 +237,10 @@ export class Model {
         if (this._subModels[idx] == null) {
             this._subModels[idx] = _subMeshPool.alloc();
         } else {
-            const oldMat = this._subModels[idx].material;
             this._subModels[idx].destroy();
-            this.releasePSO(oldMat!);
         }
-        this.allocatePSO(mat, idx);
-        this._subModels[idx].initialize(subMeshData, mat, this._matPSORecord.get(mat)!);
+        this._subModels[idx].initialize(subMeshData, mat, this.getMacroPatches(idx));
+        this.updateAttributesAndBinding(idx);
         this._inited = true;
     }
 
@@ -274,86 +254,59 @@ export class Model {
     public setSubModelMaterial (idx: number, mat: Material | null) {
         this.initLocalBindings(mat);
         if (!this._subModels[idx]) { return; }
-        if (this._subModels[idx].material === mat) {
-            if (mat) {
-                this.destroyPipelineStates(mat, this._matPSORecord.get(mat)!);
-                this._matPSORecord.set(mat, this.createPipelineStates(mat, idx));
-            }
-        } else {
-            if (this._subModels[idx].material) {
-                this.releasePSO(this._subModels[idx].material!);
-            }
-            if (mat) {
-                this.allocatePSO(mat, idx);
-            }
-        }
-        this._subModels[idx].psos = (mat ? this._matPSORecord.get(mat) || null : null);
         this._subModels[idx].material = mat;
+
+        if (mat) {
+            this.updateAttributesAndBinding(idx);
+        }
     }
 
     public onGlobalPipelineStateChanged () {
         const subModels = this._subModels;
-        this._matPSORecord.forEach((psos, mat) => {
-            let i = 0; for (; i < subModels.length; i++) {
-                if (subModels[i].material === mat) { break; }
-            }
-            if (i >= subModels.length) { return; }
-            for (let j = 0; j < mat.passes.length; j++) {
-                const pass = mat.passes[j];
-                pass.destroyPipelineState(psos[j]);
-                pass.beginChangeStatesSilently();
-                pass.tryCompile(); // force update shaders
-                pass.endChangeStatesSilently();
-            }
-            const newPSOs = this.createPipelineStates(mat, i);
-            psos.length = newPSOs.length;
-            for (let j = 0; j < newPSOs.length; j++) {
-                psos[j] = newPSOs[j];
-            }
-        });
-        for (let i = 0; i < subModels.length; i++) {
-            subModels[i].updateCommandBuffer();
+
+        for (let i = 0; i < subModels.length; ++i) {
+            subModels[i].onPipelineStateChanged();
+            this.updateAttributesAndBinding(i);
         }
     }
 
-    public insertImplantPSO (pso: GFXPipelineState) {
-        this._implantPSOs.push(pso);
+    public insertImplantPSOCI (psoci: IPSOCreateInfo, submodelIdx: number) {
+        this.updateLocalBindings(psoci, submodelIdx);
+        this._implantPSOCIs.push(psoci);
     }
 
-    public removeImplantPSO (pso: GFXPipelineState) {
-        const idx = this._implantPSOs.indexOf(pso);
-        if (idx >= 0) { this._implantPSOs.splice(idx, 1); }
+    public removeImplantPSOCI (psoci: IPSOCreateInfo) {
+        const idx = this._implantPSOCIs.indexOf(psoci);
+        if (idx >= 0) { this._implantPSOCIs.splice(idx, 1); }
     }
 
-    protected createPipelineStates (mat: Material, subModelIdx: number): GFXPipelineState[] {
-        const ret: GFXPipelineState[] = [];
-        for (let i = 0; i < mat.passes.length; i++) {
-            const pass = mat.passes[i];
-            ret[i] = this.createPipelineState(pass, subModelIdx);
-        }
-        if (ret[0]) { this.updateInstancedAttributeList(ret[0], mat.passes[0]); }
-        return ret;
-    }
-
-    protected destroyPipelineStates (mat: Material, pso: GFXPipelineState[]) {
-        for (let i = 0; i < mat.passes.length; i++) {
-            const pass = mat.passes[i];
-            pass.destroyPipelineState(pso[i]);
+    public updateLocalBindings (psoci: IPSOCreateInfo, submodelIdx: number) {
+        if (this._localBuffer) {
+            psoci.bindingLayout.bindBuffer(UBOLocal.BLOCK.binding, this._localBuffer);
         }
     }
 
-    protected createPipelineState (pass: Pass, subModelIdx: number, patches?: IMacroPatch[]) {
-        const pso = pass.createPipelineState(patches)!;
-        const bindingLayout = pso.pipelineLayout.layouts[0];
-        if (this._localBuffer) { bindingLayout.bindBuffer(UBOLocal.BLOCK.binding, this._localBuffer); }
-        //if (this._lightBuffer) { bindingLayout.bindBuffer(UBOForwardLight.BLOCK.binding, this._lightBuffer); }
-        return pso;
+    protected updateAttributesAndBinding (subModelIndex: number) {
+        const subModel = this._subModels[subModelIndex];
+        if (!subModel) {
+            return;
+        }
+
+        const psoCreateInfos = subModel.psoInfos;
+        for (let i = 0; i < psoCreateInfos.length; ++i) {
+            this.updateLocalBindings(psoCreateInfos[i], subModelIndex);
+        }
+
+        this.updateInstancedAttributeList(psoCreateInfos[0].shaderInput.attributes, subModel.passes[0]);
+    }
+
+    public getMacroPatches (subModelIndex: number) : IMacroPatch[] | undefined {
+        return undefined;
     }
 
     // for now no submodel level instancing attributes
-    protected updateInstancedAttributeList (pso: GFXPipelineState, pass: Pass) {
+    protected updateInstancedAttributeList (attributes: IGFXAttribute[], pass: Pass) {
         if (!pass.device.hasFeature(GFXFeature.INSTANCED_ARRAYS)) { return; }
-        const attributes = pso.inputState.attributes;
         let size = 0;
         for (let j = 0; j < attributes.length; j++) {
             const attribute = attributes[j];
@@ -394,41 +347,9 @@ export class Model {
                 stride: UBOLocal.SIZE,
             });
         }
-        if (!mat) { return; }
-        let hasForwardLight = false;
-        for (const p of mat.passes) {
-            const blocks = programLib.getTemplate(p.program).builtins.locals.blocks;
-            if (blocks.find((b) => b.name === UBOForwardLight.BLOCK.name)) {
-                hasForwardLight = true;
-                break;
-            }
-        }
     }
 
-    private _updatePass (psos: GFXPipelineState[], mat: Material) {
-        for (let i = 0; i < mat.passes.length; i++) {
-            mat.passes[i].update();
-        }
-        for (let i = 0; i < psos.length; i++) {
-            psos[i].pipelineLayout.layouts[0].update();
-        }
-    }
-
-    private allocatePSO (mat: Material, subModelIdx: number) {
-        if (this._matRefCount.get(mat) == null) {
-            this._matRefCount.set(mat, 1);
-            this._matPSORecord.set(mat, this.createPipelineStates(mat, subModelIdx));
-        } else {
-            this._matRefCount.set(mat, this._matRefCount.get(mat)! + 1);
-        }
-    }
-
-    private releasePSO (mat: Material) {
-        this._matRefCount.set(mat, this._matRefCount.get(mat)! - 1);
-        if (this._matRefCount.get(mat) === 0) {
-            this.destroyPipelineStates(mat, this._matPSORecord.get(mat)!);
-            this._matPSORecord.delete(mat);
-            this._matRefCount.delete(mat);
-        }
+    private _updatePass (subModel: SubModel) {
+        subModel.update();
     }
 }

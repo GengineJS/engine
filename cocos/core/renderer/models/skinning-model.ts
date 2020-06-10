@@ -41,6 +41,7 @@ import { Pass, IMacroPatch } from '../core/pass';
 import { ModelType } from '../scene/model';
 import { uploadJointData } from './skeletal-animation-utils';
 import { MorphModel } from './morph-model';
+import { IPSOCreateInfo } from '../scene/submodel';
 
 export interface IJointTransform {
     node: Node;
@@ -245,15 +246,20 @@ export class SkinningModel extends MorphModel {
         subMeshData.vertexBuffers = original;
     }
 
-    protected createPipelineState (pass: Pass, subModelIdx: number, patches?: IMacroPatch[]) {
-        if (EDITOR && pass.instancedBuffer) {
-            console.warn('real-time skeletal animation doesn\'t support instancing, expect rendering anomalies');
+    public getMacroPatches (subModelIndex: number) : any {
+        const superMacroPatches = super.getMacroPatches(subModelIndex);
+        if (superMacroPatches) {
+            return myPatches.concat(superMacroPatches);
+        } else {
+            return myPatches;
         }
-        const pso = super.createPipelineState(pass, subModelIdx, patches?.concat(myPatches) ?? myPatches);
-        const bindingLayout = pso.pipelineLayout.layouts[0];
-        const buffer = this._buffers[this._bufferIndices![subModelIdx]];
+    }
+
+    public updateLocalBindings (psoci: IPSOCreateInfo, submodelIdx: number) {
+        super.updateLocalBindings(psoci, submodelIdx);
+        const bindingLayout = psoci.bindingLayout;
+        const buffer = this._buffers[this._bufferIndices![submodelIdx]];
         if (buffer) { bindingLayout.bindBuffer(UBOSkinning.BLOCK.binding, buffer); }
-        return pso;
     }
 
     private _ensureEnoughBuffers (count: number) {
