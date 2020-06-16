@@ -1,6 +1,5 @@
 import { frustum, ray } from '../../geometry';
 import { GFXClearFlag, IGFXColor } from '../../gfx/define';
-import { GFXWindow } from '../../gfx/window';
 import { lerp, Mat4, Rect, toRadian, Vec3 } from '../../math';
 import { CAMERA_DEFAULT_MASK } from '../../pipeline/define';
 import { RenderView } from '../../pipeline/render-view';
@@ -8,6 +7,7 @@ import { Node } from '../../scene-graph';
 import { RenderScene } from './render-scene';
 import { GFXDevice } from '../../gfx';
 import { legacyCC } from '../../global-exports';
+import { RenderWindow } from '../../pipeline';
 
 export enum CameraFOVAxis {
     VERTICAL,
@@ -78,7 +78,7 @@ export interface ICameraInfo {
     node: Node;
     projection: number;
     targetDisplay?: number;
-    window?: GFXWindow | null;
+    window?: RenderWindow | null;
     priority: number;
     pipeline?: string;
     flows?: string[];
@@ -524,7 +524,7 @@ export class Camera {
         }
     }
 
-    public changeTargetWindow (window: GFXWindow | null = null) {
+    public changeTargetWindow (window: RenderWindow | null = null) {
         const win = window || legacyCC.director.root.mainWindow;
         if (win && this._view) {
             this._view.window = win;
@@ -543,6 +543,7 @@ export class Camera {
 
         // far plane intersection
         Vec3.set(v_a, (x - cx) / cw * 2 - 1, (y - cy) / ch * 2 - 1, 1);
+        v_a.y *= this._device.projectionSignY;
         Vec3.transformMat4(v_a, v_a, this._matViewProjInv);
 
         if (this._proj === CameraProjection.PERSPECTIVE) {
@@ -551,6 +552,7 @@ export class Camera {
         } else {
             // near plane intersection
             Vec3.set(v_b, (x - cx) / cw * 2 - 1, (y - cy) / ch * 2 - 1, -1);
+            v_b.y *= this._device.projectionSignY;
             Vec3.transformMat4(v_b, v_b, this._matViewProjInv);
         }
 
