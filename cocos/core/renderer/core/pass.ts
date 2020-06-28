@@ -31,7 +31,7 @@ import { EDITOR } from 'internal:constants';
 import { builtinResMgr } from '../../3d/builtin/init';
 import { IPassInfo, IPassStates, IPropertyInfo } from '../../assets/effect-asset';
 import { TextureBase } from '../../assets/texture-base';
-import { GFXBindingLayout, IGFXBinding, IGFXBindingLayoutInfo } from '../../gfx/binding-layout';
+import { GFXBindingLayout, IGFXBindingLayoutInfo } from '../../gfx/binding-layout';
 import { GFXBuffer, IGFXBufferInfo } from '../../gfx/buffer';
 import { GFXBindingType, GFXBufferUsageBit, GFXDynamicState,
     GFXGetTypeSize, GFXMemoryUsageBit, GFXPrimitiveMode, GFXType } from '../../gfx/define';
@@ -94,7 +94,7 @@ const _bfInfo: IGFXBufferInfo = {
 };
 
 const _blInfo: IGFXBindingLayoutInfo = {
-    bindings: null!,
+    shader: null!,
 };
 
 // tslint:disable: no-shadowed-variable
@@ -161,7 +161,7 @@ export class Pass {
      */
     public static getPassHash (passHashInfo: IPassHashInfo) {
         const shaderKey = programLib.getKey(passHashInfo.program, passHashInfo.defines);
-        let res = `${shaderKey},${passHashInfo.primitive}`;
+        let res = shaderKey + ',' + passHashInfo.primitive;
         res += serializeBlendState(passHashInfo.blendState);
         res += serializeDepthStencilState(passHashInfo.depthStencilState);
         res += serializeRasterizerState(passHashInfo.rasterizerState);
@@ -198,7 +198,6 @@ export class Pass {
     protected _root: Root;
     protected _device: GFXDevice;
     protected _shader: GFXShader | null = null;
-    protected _bindings: IGFXBinding[] = [];
     // for dynamic batching
     protected _batchedBuffer: BatchedBuffer | null = null;
     protected _instancedBuffer: InstancedBuffer | null = null;
@@ -503,9 +502,12 @@ export class Pass {
         const pipeline = this._root.pipeline;
         if (!pipeline) { return null; }
         this._dynamicBatchingSync();
-        const res = programLib.getGFXShader(this._device, this._programName, this._defines, pipeline);
-        if (!res.shader) { console.warn(`create shader ${this._programName} failed`); return false; }
-        this._shader = res.shader; this._bindings = res.bindings;
+        Object.assign(this._defines, pipeline.macros);
+        const key = programLib.getKey(this._programName, this._defines);
+        const shader = programLib.getGFXShader(this._device, this._programName, this._defines, pipeline, key);
+        if (!shader) { console.warn(`create shader ${this._programName} failed`); return false; }
+        this._shader = shader;
+        this._hash = Pass.getPassHash(this);
         return true;
     }
 
@@ -517,13 +519,12 @@ export class Pass {
      * @param patches the marcos to be used in shader.
      */
     public createPipelineStateCI (patches?: IMacroPatch[]): IPSOCreateInfo | null {
-        if ((!this._shader || !this._bindings.length) && !this.tryCompile()) {
+        if ((!this._shader) && !this.tryCompile()) {
             console.warn(`pass resources not complete, create PSO hash info failed`);
             return null;
         }
         const res = patches ? this._getShaderWithBuiltinMacroPatches (patches) : null;
-        const shader = res && res.shader || this._shader!;
-        _blInfo.bindings = res && res.bindings || this._bindings;
+        const shader = _blInfo.shader = res || this._shader!;
         // bind resources
         const bindingLayout = this._device.createBindingLayout(_blInfo);
         for (const b in this._buffers) {
@@ -594,7 +595,6 @@ export class Pass {
         const device = this._device;
         Pass.fillinPipelineInfo(this, info);
         if (info.stateOverrides) { Pass.fillinPipelineInfo(this, info.stateOverrides); }
-        this._hash = Pass.getPassHash(this);
 
         const blocks = this._shaderInfo.blocks;
         for (let i = 0; i < blocks.length; i++) {
@@ -685,7 +685,6 @@ export class Pass {
     get idxInTech () { return this._idxInTech; }
     // resources
     get shader () { return this._shader!; }
-    get bindings () { return this._bindings; }
     get dynamics () { return this._dynamics; }
     get batchedBuffer () { return this._batchedBuffer; }
     get instancedBuffer () { return this._instancedBuffer; }
@@ -703,8 +702,7 @@ function serializeBlendState (bs: GFXBlendState) {
 }
 
 function serializeRasterizerState (rs: GFXRasterizerState) {
-    const res = `,rs,${rs.cullMode},${rs.depthBias},${rs.isFrontFaceCCW}`;
-    return res;
+    return ',rs,' + rs.cullMode + ',' + rs.depthBias + ',' + rs.isFrontFaceCCW;
 }
 
 function serializeDepthStencilState (dss: GFXDepthStencilState) {
@@ -717,9 +715,9 @@ function serializeDepthStencilState (dss: GFXDepthStencilState) {
 }
 
 function serializeDynamicState (dynamicStates: GFXDynamicState[]) {
-    let res = `,ds`;
+    let res = ',ds';
     for (const ds in dynamicStates) {
-        res += `,${ds}`;
+        res += ',' + ds;
     }
     return res;
 }

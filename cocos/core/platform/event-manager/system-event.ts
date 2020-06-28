@@ -120,7 +120,7 @@ export class SystemEvent extends EventTarget {
         if (EDITOR && !legacyCC.engine.isPlaying) {
             return;
         }
-        super.on(type, callback, target);
+        super.on(type, callback, target, once);
 
         // Keyboard
         if (type === SystemEventType.KEY_DOWN || type === SystemEventType.KEY_UP) {

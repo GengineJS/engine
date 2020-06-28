@@ -1,4 +1,4 @@
-import Ammo from '@cocos/ammo';
+import Ammo from '../ammo-instantiated';
 import { Vec3, Quat } from "../../../core/math";
 import { ColliderComponent, RigidBodyComponent, PhysicMaterial, PhysicsSystem } from "../../../../exports/physics-framework";
 import { AmmoWorld } from '../ammo-world';
@@ -119,7 +119,7 @@ export class AmmoShape implements IBaseShape {
         this._btCompound = null;
         (this._collider as any) = null;
         const shape = Ammo.castObject(this._btShape, Ammo.btCollisionShape);
-        shape.wrapped = null;
+        shape['wrapped'] = null;
         Ammo.destroy(this.transform);
         Ammo.destroy(this.pos);
         Ammo.destroy(this.quat);
@@ -184,7 +184,7 @@ export class AmmoShape implements IBaseShape {
 
     setWrapper () {
         const shape = Ammo.castObject(this._btShape, Ammo.btCollisionShape);
-        shape.wrapped = this;
+        shape['wrapped'] = this;
     }
 
     setScale () {
