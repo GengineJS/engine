@@ -117,7 +117,7 @@ export class SystemEvent extends EventTarget {
      * @param target - The event listener's target and callee
      */
     public on (type: string, callback: Function, target?: Object) {
-        if (EDITOR) {
+        if (EDITOR && !legacyCC.engine.isPlaying) {
             return;
         }
         super.on(type, callback, target);
