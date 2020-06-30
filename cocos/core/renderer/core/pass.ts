@@ -625,11 +625,11 @@ export class Pass {
             if (!this._device.hasFeature(GFXFeature.INSTANCED_ARRAYS)) {
                 this._defines.USE_INSTANCING = false;
             } else if (!this._instancedBuffer) {
-                this._instancedBuffer = new InstancedBuffer(this);
+                this._instancedBuffer = new InstancedBuffer(this.device);
             }
         } else if (this._defines.USE_BATCHING) {
             if (!this._batchedBuffer) {
-                this._batchedBuffer = new BatchedBuffer(this);
+                this._batchedBuffer = new BatchedBuffer(this.device);
             }
         }
         if (!this._defines.USE_INSTANCING && this._instancedBuffer) {
