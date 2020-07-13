@@ -560,7 +560,7 @@ export class ButtonComponent extends Component {
     public onEnable () {
         // check sprite frames
         //
-        if (!EDITOR) {
+        if (!EDITOR || legacyCC.engine._isPlaying) {
             this._registerEvent();
         } else {
             this.node.on(SpriteComponent.EventType.SPRITE_FRAME_CHANGED, (comp: SpriteComponent) => {
