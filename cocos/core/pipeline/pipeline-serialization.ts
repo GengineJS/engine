@@ -13,6 +13,10 @@ ccenum(GFXStoreOp);
 ccenum(GFXLoadOp);
 ccenum(GFXTextureLayout);
 
+/**
+ * @en The type of the render flow, including SCENE, POSTPROCESS and UI.
+ * @zh 渲染流程的种类，包含：常规场景（SCENE），后处理（POSTPROCESS），UI 界面（UI）
+ */
 export enum RenderFlowType {
     SCENE,
     POSTPROCESS,
@@ -60,9 +64,9 @@ export class ColorDesc {
     @property
     public sampleCount: number = 1;
     @property({ type: GFXTextureLayout })
-    public beginLayout: GFXTextureLayout = GFXTextureLayout.COLOR_ATTACHMENT_OPTIMAL;
+    public beginLayout: GFXTextureLayout = GFXTextureLayout.UNDEFINED;
     @property({ type: GFXTextureLayout })
-    public endLayout: GFXTextureLayout = GFXTextureLayout.COLOR_ATTACHMENT_OPTIMAL;
+    public endLayout: GFXTextureLayout = GFXTextureLayout.PRESENT_SRC;
 }
 
 @ccclass('DepthStencilDesc')
@@ -80,9 +84,9 @@ export class DepthStencilDesc {
     @property
     public sampleCount: number = 1;
     @property({ type: GFXTextureLayout })
-    public beginLayout: GFXTextureLayout = GFXTextureLayout.COLOR_ATTACHMENT_OPTIMAL;
+    public beginLayout: GFXTextureLayout = GFXTextureLayout.UNDEFINED;
     @property({ type: GFXTextureLayout })
-    public endLayout: GFXTextureLayout = GFXTextureLayout.COLOR_ATTACHMENT_OPTIMAL;
+    public endLayout: GFXTextureLayout = GFXTextureLayout.DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 }
 
 @ccclass('RenderPassDesc')

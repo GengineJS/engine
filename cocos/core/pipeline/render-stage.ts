@@ -6,11 +6,10 @@ import { CCString } from '../data';
 import { ccclass, property } from '../data/class-decorator';
 import { GFXCommandBuffer } from '../gfx/command-buffer';
 import { GFXClearFlag, GFXCommandBufferType, IGFXColor, IGFXRect } from '../gfx/define';
-import { GFXDevice } from '../gfx/device';
 import { GFXFramebuffer } from '../gfx/framebuffer';
 import { Pass } from '../renderer/core/pass';
 import { ccenum } from '../value-types/enum';
-import { IRenderPass } from './define';
+import { IRenderPass, RenderPassStage } from './define';
 import { getPhaseID } from './pass-phase';
 import { RenderFlow } from './render-flow';
 import { RenderPipeline } from './render-pipeline';
@@ -18,6 +17,7 @@ import { opaqueCompareFn, RenderQueue, transparentCompareFn } from './render-que
 import { RenderView } from './render-view';
 import { IPSOCreateInfo } from '../renderer';
 import { legacyCC } from '../global-exports';
+import { PipelineGlobal } from './global';
 
 const _colors: IGFXColor[] = [ { r: 0, g: 0, b: 0, a: 1 } ];
 const bufs: GFXCommandBuffer[] = [];
@@ -30,8 +30,8 @@ export enum RenderQueueSortMode {
 ccenum(RenderQueueSortMode);
 
 /**
- * @zh
- * 渲染阶段描述信息。
+ * @en The render stage information descriptor
+ * @zh 渲染阶段描述信息。
  */
 export interface IRenderStageInfo {
     name?: string;
@@ -40,61 +40,80 @@ export interface IRenderStageInfo {
     framebuffer?: string;
 }
 
+/**
+ * @en The render queue descriptor
+ * @zh 渲染队列描述信息
+ */
 @ccclass('RenderQueueDesc')
 class RenderQueueDesc {
 
+    /**
+     * @en Whether the render queue is a transparent queue
+     * @zh 当前队列是否是半透明队列
+     */
     @property
     public isTransparent: boolean = false;
 
+    /**
+     * @en The sort mode of the render queue
+     * @zh 渲染队列的排序模式
+     */
     @property({ type: RenderQueueSortMode })
     public sortMode: RenderQueueSortMode = RenderQueueSortMode.FRONT_TO_BACK;
 
+    /**
+     * @en The stages using this queue
+     * @zh 使用当前渲染队列的阶段列表
+     */
     @property({ type: [CCString] })
     public stages: string[] = [];
 }
 
 /**
- * @zh
- * 渲染阶段。
+ * @en The render stage actually renders render objects to the output window or other [[GFXFrameBuffer]].
+ * Typically, a render stage collects render objects it's responsible for, clear the camera,
+ * record and execute command buffer, and at last present the render result.
+ * @zh 渲染阶段是实质上的渲染执行者，它负责收集渲染数据并执行渲染将渲染结果输出到屏幕或其他 [[GFXFrameBuffer]] 中。
+ * 典型的渲染阶段会收集它所管理的渲染对象，按照 [[Camera]] 的清除标记进行清屏，记录并执行渲染指令缓存，并最终呈现渲染结果。
  */
 @ccclass('RenderStage')
 export abstract class RenderStage {
 
     /**
-     * @zh
-     * 渲染流程。
+     * @en The render flow the current stage belongs to
+     * @zh 当前渲染阶段所归属的渲染流程。
      */
     public get flow (): RenderFlow {
         return this._flow;
     }
 
     /**
-     * @zh
-     * 渲染管线。
+     * @en The render pipeline the current stage belongs to
+     * @zh 当前渲染阶段所归属的渲染管线。
      */
     public get pipeline (): RenderPipeline {
         return this._pipeline;
     }
 
     /**
-     * @zh
-     * 优先级。
+     * @en Priority of the current stage
+     * @zh 当前渲染阶段的优先级。
      */
     public get priority (): number {
         return this._priority;
     }
 
     /**
-     * @zh
-     * 渲染流程。
+     * @en The frame buffer used by the current stage
+     * @zh 当前渲染阶段所使用的帧缓冲
      */
     public get framebuffer (): GFXFramebuffer | null {
         return this._framebuffer;
     }
 
     /**
-     * @zh
-     * 名称。
+     * @en Name
+     * @zh 名称。
      */
     @property({
         displayOrder: 0,
@@ -102,10 +121,6 @@ export abstract class RenderStage {
     })
     protected _name: string = '';
 
-    /**
-     * @zh
-     * 优先级。
-     */
     @property({
         displayOrder: 1,
         visible: true,
@@ -127,83 +142,58 @@ export abstract class RenderStage {
 
     protected _renderQueues: RenderQueue[] = [];
 
-    /**
-     * @zh
-     * 渲染流程。
-     */
     protected _flow: RenderFlow = null!;
 
-    /**
-     * @zh
-     * 渲染管线。
-     */
     protected _pipeline: RenderPipeline = null!;
 
-    /**
-     * @zh
-     * GFX设备。
-     */
-    protected _device: GFXDevice | null = null;
-
-    /**
-     * @zh
-     * 渲染流程。
-     */
     protected _framebuffer: GFXFramebuffer | null = null;
 
     /**
-     * @zh
-     * 命令缓冲。
+     * @en The command buffer
+     * @zh 命令缓冲。
      */
     protected _cmdBuff: GFXCommandBuffer | null = null;
 
     /**
-     * @zh
-     * 清空颜色数组。
+     * @en The list of clear colors
+     * @zh 清空颜色数组。
      */
     protected _clearColors: IGFXColor[] | null = null;
 
     /**
-     * @zh
-     * 清空深度。
+     * @en The clear depth
+     * @zh 清空深度。
      */
     protected _clearDepth: number = 1.0;
 
     /**
-     * @zh
-     * 清空模板。
+     * @en The clear stencil mask
+     * @zh 清空模板。
      */
     protected _clearStencil: number = 0;
 
     /**
-     * @zh
-     * 渲染区域。
+     * @en The render area rect
+     * @zh 渲染区域。
      */
     protected _renderArea: IGFXRect | null = null;
 
     /**
-     * @zh
-     * 着色过程。
+     * @en The render pass of this stage
+     * @zh 着色过程。
      */
     protected _pass: Pass | null = null;
 
     /**
-     * @zh
-     * GFX管线状态。
+     * @en The pipeline state object.
+     * @zh GFX管线状态。
      */
     protected _psoCreateInfo: IPSOCreateInfo | null = null;
 
     /**
-     * 构造函数。
-     * @param flow 渲染流程。
-     */
-    constructor () {
-    }
-
-    /**
-     * @zh
-     * 初始化函数，用于不从资源加载RenderPipeline时使用。
-     * @param info 渲染阶段描述信息。
+     * @en The initialization process, user shouldn't use it in most case, only useful when need to generate render pipeline programmatically.
+     * @zh 初始化函数，正常情况下不会用到，仅用于程序化生成渲染管线的情况。
+     * @param info The render stage information
      */
     public initialize (info: IRenderStageInfo): boolean {
         if (info.name !== undefined) {
@@ -224,14 +214,15 @@ export abstract class RenderStage {
     }
 
     /**
-     * 把序列化数据转换成运行时数据
+     * @en Activate the current render stage in the given render flow
+     * @zh 为指定的渲染流程开启当前渲染阶段
+     * @param flow The render flow to activate this render stage
      */
     public activate (flow: RenderFlow) {
         this._flow = flow;
         this._pipeline = flow.pipeline;
-        this._device = flow.device;
 
-        if (!this._flow.pipeline.root.device) {
+        if (!PipelineGlobal.device) {
             throw new Error('');
         }
 
@@ -260,42 +251,43 @@ export abstract class RenderStage {
         }
 
         if (this.frameBuffer === 'window') {
-            this._framebuffer = this._flow.pipeline.root.mainWindow!.framebuffer!;
+            this._framebuffer = PipelineGlobal.root.mainWindow!.framebuffer;
         } else {
             this._framebuffer = this._flow.pipeline.getFrameBuffer(this.frameBuffer)!;
         }
     }
 
     /**
-     * @zh
-     * 销毁函数。
+     * @en Destroy function
+     * @zh 销毁函数。
      */
     public abstract destroy ();
 
     /**
-     * @zh
-     * 渲染函数。
-     * @param view 渲染视图。
+     * @en Render function
+     * @zh 渲染函数。
+     * @param view The render view
      */
     public abstract render (view: RenderView);
 
     /**
-     * @zh
-     * 重置大小。
-     * @param width 屏幕宽度。
-     * @param height 屏幕高度。
+     * @en Reset the size.
+     * @zh 重置大小。
+     * @param width The screen width
+     * @param height The screen height
      */
     public abstract resize (width: number, height: number);
 
     /**
-     * @zh
-     * 重构函数。
+     * @en Rebuild function.
+     * @zh 重构函数。
      */
     public abstract rebuild ();
 
     /**
-     * @zh
-     * 设置清空颜色。
+     * @en Set the clear color
+     * @zh 设置清空颜色。
+     * @param color The clear color
      */
     public setClearColor (color: IGFXColor) {
         if (this._clearColors!.length > 0) {
@@ -306,38 +298,47 @@ export abstract class RenderStage {
     }
 
     /**
-     * @zh
-     * 设置清空颜色数组。
+     * @en The the entire list of clear colors
+     * @zh 设置清空颜色数组。
+     * @param colors The clear colors
      */
     public setClearColors (colors: IGFXColor[]) {
         this._clearColors = colors;
     }
 
     /**
-     * @zh
-     * 设置清空深度。
+     * @en Set clear depth
+     * @zh 设置清空深度。
+     * @param depth The clear depth
      */
     public setClearDepth (depth: number) {
         this._clearDepth = depth;
     }
 
     /**
-     * @zh
-     * 设置清空模板。
+     * @en Set clear stencil mask
+     * @zh 设置清空模板。
+     * @param stencil The clear stencil mask
      */
     public setClearStencil (stencil: number) {
         this._clearStencil = stencil;
     }
 
     /**
-     * @zh
-     * 设置渲染区域。
+     * @en Set the render area rect size
+     * @zh 设置渲染区域。
+     * @param width The render area width
+     * @param height The render area height
      */
     public setRenderArea (width: number, height: number) {
         this._renderArea!.width = width;
         this._renderArea!.height = height;
     }
 
+    /**
+     * @en Sort all render queues
+     * @zh 对所有渲染队列进行排序
+     */
     public sortRenderQueue () {
         this._renderQueues.forEach(this.renderQueueClearFunc);
         const renderObjects = this._pipeline.renderObjects;
@@ -354,6 +355,11 @@ export abstract class RenderStage {
         this._renderQueues.forEach(this.renderQueueSortFunc);
     }
 
+    /**
+     * @en Execute the command buffers collected in all render queue for the given render view and submit.
+     * @zh 基于指定的渲染视图执行所有渲染队列中收集的命令缓冲并提交渲染
+     * @param view The render view
+     */
     public executeCommandBuffer (view: RenderView) {
         const camera = view.camera;
 
@@ -372,34 +378,48 @@ export abstract class RenderStage {
             _colors[0].b = camera.clearColor.b;
         }
         if (!this._framebuffer) {
-            this._framebuffer = view.window!.framebuffer;
+            this._framebuffer = view.window.framebuffer;
         }
+        const renderPass = this._framebuffer.renderPass;
 
         cmdBuff.begin();
-        cmdBuff.beginRenderPass(this._framebuffer!, this._renderArea!,
-            camera.clearFlag, _colors, camera.clearDepth, camera.clearStencil);
+        cmdBuff.beginRenderPass(renderPass, this._framebuffer!, this._renderArea!, _colors, camera.clearDepth, camera.clearStencil);
 
         for (let i = 0; i < this._renderQueues.length; i++) {
-            this._renderQueues[i].recordCommandBuffer(this._device!, this._framebuffer.renderPass!, cmdBuff);
+            this._renderQueues[i].recordCommandBuffer(PipelineGlobal.device, this._framebuffer.renderPass!, cmdBuff);
         }
 
         cmdBuff.endRenderPass();
         cmdBuff.end();
         bufs[0] = cmdBuff;
-        this._device!.queue.submit(bufs);
+        PipelineGlobal.device.queue.submit(bufs);
     }
 
+    /**
+     * @en Create the main command buffer of this stage
+     * @zh 创建该阶段的主命令缓冲
+     */
     public createCmdBuffer () {
-        this._cmdBuff = this._device!.createCommandBuffer({
-            queue: this._device!.queue,
+        this._cmdBuff = PipelineGlobal.device.createCommandBuffer({
+            queue: PipelineGlobal.device.queue,
             type: GFXCommandBufferType.PRIMARY,
         });
     }
 
+    /**
+     * @en Clear the given render queue
+     * @zh 清空指定的渲染队列
+     * @param rq The render queue
+     */
     protected renderQueueClearFunc (rq: RenderQueue) {
         rq.clear();
     }
 
+    /**
+     * @en Sort the given render queue
+     * @zh 对指定的渲染队列执行排序
+     * @param rq The render queue
+     */
     protected renderQueueSortFunc (rq: RenderQueue) {
         rq.sort();
     }

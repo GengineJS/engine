@@ -2,7 +2,7 @@
  * @hidden
  */
 
-import { GFXAttributeName, GFXDevice, GFXSampler, GFXBuffer, GFXBufferUsageBit, GFXMemoryUsageBit, GFXPipelineState, GFXFormat, GFXTexture } from '../gfx';
+import { GFXAttributeName, GFXDevice, GFXSampler, GFXBuffer, GFXBufferUsageBit, GFXMemoryUsageBit, GFXPipelineState } from '../gfx';
 import { Mesh } from './mesh';
 import { Texture2D } from './texture-2d';
 import { ImageAsset } from './image-asset';
@@ -205,8 +205,8 @@ class GpuComputing implements SubMeshMorphRendering {
                 textureInfo.displacements.push(...new Float32Array(meshData, displacements.offset, displacements.count));
             });
 
-            const pixelStride = 4; // For position, normal, tangent
-            const pixelFormat = Texture2D.PixelFormat.RGBA32F; // For position, normal, tangent
+            const pixelStride = 3; // For position, normal, tangent
+            const pixelFormat = Texture2D.PixelFormat.RGB32F; // For position, normal, tangent
 
             const textureSource = new Float32Array(pixelStride * width * height);
             const headPixels = nTargets;
@@ -473,7 +473,7 @@ class CpuComputingRenderingInstance implements SubMeshMorphRenderingInstance {
     }
 }
 
-namespace CpuRenderingInstance {
+declare namespace CpuRenderingInstance {
     export interface AttributeMorphResource {
         attributeName: string;
         local: Float32Array;

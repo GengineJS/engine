@@ -1,23 +1,22 @@
 /**
- * @category pipeline.ppfx
+ * @category pipeline
  */
 
 import { ccclass } from '../../data/class-decorator';
 import { GFXBindingLayout } from '../../gfx/binding-layout';
 import { GFXCommandBuffer } from '../../gfx/command-buffer';
-import { GFXClearFlag, GFXCommandBufferType } from '../../gfx/define';
 import { UBOGlobal } from '../define';
 import { RenderFlow } from '../render-flow';
 import { IRenderStageInfo, RenderStage } from '../render-stage';
 import { RenderView } from '../render-view';
 import { PipelineStateManager } from '../pipeline-state-manager';
+import { PipelineGlobal } from '../global';
 
 const bufs: GFXCommandBuffer[] = [];
 
 /**
- * @zh
- * 色调映射渲染阶段。
- *
+ * @en The tone mapping render stage
+ * @zh 色调映射渲染阶段。
  */
 @ccclass('ToneMapStage')
 export class ToneMapStage extends RenderStage {
@@ -31,10 +30,6 @@ export class ToneMapStage extends RenderStage {
     private _hTexSampler: number = 0;
     private _hBlendTexSampler: number = 0;
     private _bindingLayout: GFXBindingLayout | null = null;
-
-    constructor () {
-        super();
-    }
 
     public activate (flow: RenderFlow) {
 
@@ -79,27 +74,27 @@ export class ToneMapStage extends RenderStage {
     public render (view: RenderView) {
 
         const camera = view.camera!;
+        const cmdBuff = this._cmdBuff!;
 
-        if (this._cmdBuff) {
+        this._renderArea!.width = camera.width;
+        this._renderArea!.height = camera.height;
 
-            this._renderArea!.width = camera.width;
-            this._renderArea!.height = camera.height;
-            const framebuffer = view.window!.framebuffer;
+        const framebuffer = view.window.framebuffer;
+        const renderPass = framebuffer.renderPass;
 
-            this._cmdBuff.begin();
-            this._cmdBuff.beginRenderPass(framebuffer, this._renderArea!,
-                GFXClearFlag.ALL, [{ r: 0.0, g: 0.0, b: 0.0, a: 1.0 }], 1.0, 0);
-            const pso =  PipelineStateManager.getOrCreatePipelineState(this._device!, this._psoCreateInfo!, framebuffer.renderPass!, this._pipeline!.quadIA);
-            this._cmdBuff.bindPipelineState(pso);
-            this._cmdBuff.bindBindingLayout(this._psoCreateInfo!.bindingLayout);
-            this._cmdBuff.bindInputAssembler(this._pipeline!.quadIA);
-            this._cmdBuff.draw(this._pipeline!.quadIA);
-            this._cmdBuff.endRenderPass();
-            this._cmdBuff.end();
-        }
+        cmdBuff.begin();
+        cmdBuff.beginRenderPass(renderPass, framebuffer, this._renderArea!, [{ r: 0.0, g: 0.0, b: 0.0, a: 1.0 }], 1.0, 0);
+        const pso =  PipelineStateManager.getOrCreatePipelineState(PipelineGlobal.device,
+            this._psoCreateInfo!, framebuffer.renderPass!, this._pipeline!.quadIA);
+        cmdBuff.bindPipelineState(pso);
+        cmdBuff.bindBindingLayout(this._psoCreateInfo!.bindingLayout);
+        cmdBuff.bindInputAssembler(this._pipeline!.quadIA);
+        cmdBuff.draw(this._pipeline!.quadIA);
+        cmdBuff.endRenderPass();
+        cmdBuff.end();
 
-        bufs[0] = this._cmdBuff!;
-        this._device!.queue.submit(bufs);
+        bufs[0] = cmdBuff;
+        PipelineGlobal.device.queue.submit(bufs);
 
         // this._pipeline.swapFBOs();
     }

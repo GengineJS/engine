@@ -792,6 +792,8 @@ export class Game extends EventTarget {
 
         debug.setDisplayStats(!!config.showFPS);
 
+        director.startAnimation();
+
         callback = (time: number) => {
             if (this._paused) { return; }
             this._intervalId = window.rAF(callback);
@@ -891,7 +893,7 @@ export class Game extends EventTarget {
         if (this.renderType === Game.RENDER_TYPE_WEBGL) {
             const ctors: Constructor<GFXDevice>[] = [];
 
-            if (JSB) {
+            if (JSB && window.gfx) {
                 if (gfx.CCVKDevice) { ctors.push(gfx.CCVKDevice); }
                 if (gfx.CCMTLDevice) { ctors.push(gfx.CCMTLDevice); }
                 if (gfx.GLES3Device) { ctors.push(gfx.GLES3Device); }

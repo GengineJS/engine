@@ -1,5 +1,5 @@
 /**
- * @category pipeline.forward
+ * @category pipeline
  */
 
 import { ccclass } from '../../data/class-decorator';
@@ -11,7 +11,6 @@ import { DirectionalLight } from '../../renderer/scene/directional-light';
 import { LightType } from '../../renderer/scene/light';
 import { SphereLight } from '../../renderer/scene/sphere-light';
 import { SpotLight } from '../../renderer/scene/spot-light';
-import { Root } from '../../root';
 import { cullDirectionalLight, cullSphereLight, cullSpotLight } from '../culling';
 import { UBOForwardLight } from '../define';
 import { IRenderPipelineInfo, RenderPipeline } from '../render-pipeline';
@@ -20,96 +19,78 @@ import { UIFlow } from '../ui/ui-flow';
 import { ForwardFlow } from './forward-flow';
 import { ToneMapFlow } from '../ppfx/tonemap-flow';
 import { GFXBufferUsageBit, GFXMemoryUsageBit } from '../../gfx/define';
+import { PipelineGlobal } from '../global';
 
 const _vec4Array = new Float32Array(4);
 const _sphere = sphere.create(0, 0, 0, 1);
 const _tempVec3 = new Vec3();
 
 /**
- * @zh
- * 前向渲染管线。
+ * @en The forward render pipeline
+ * @zh 前向渲染管线。
  */
 @ccclass('ForwardPipeline')
 export class ForwardPipeline extends RenderPipeline {
     public static initInfo: IRenderPipelineInfo = {
     };
 
+    /**
+     * @en The uniform buffer for lights
+     * @zh 光源的 UBO 缓冲。
+     */
     public get lightsUBO (): GFXBuffer {
         return this._lightsUBO!;
     }
 
     /**
-     * @zh
-     * 获取参与渲染的灯光。
+     * @en The lights participating the render process
+     * @zh 参与渲染的灯光。
      */
     public get validLights () {
         return this._validLights;
     }
 
     /**
-     * @zh
-     * 获取灯光索引偏移量数组。
+     * @en The index buffer offset of lights
+     * @zh 灯光索引缓存偏移量数组。
      */
     public get lightIndexOffsets () {
         return this._lightIndexOffset;
     }
 
     /**
-     * @zh
-     * 获取灯光索引数组。
+     * @en The indices of lights
+     * @zh 灯光索引数组。
      */
     public get lightIndices () {
         return this._lightIndices;
     }
 
     /**
-     * @zh
-     * 灯光GFXbuffer数组。
+     * @en The buffer array of lights
+     * @zh 灯光 buffer 数组。
      */
     public get lightBuffers () {
         return this._lightBuffers;
     }
 
     /**
-     * @zh
-     * 全部光源的UBO结构描述。
+     * @en The ubo layout for all forward lights 
+     * @zh 全部前向光源的 UBO 结构描述。
      */
     protected _uboLight: UBOForwardLight = new UBOForwardLight();
 
     /**
-     * @zh
-     * 全部光源的UBO缓冲。
+     * @en The uniform buffer for lights
+     * @zh 全部光源的 UBO 缓冲。
      */
     protected _lightsUBO: GFXBuffer | null = null;
 
-    /**
-     * @zh
-     * 参与渲染的灯光。
-     */
     private _validLights: Light[];
-
-    /**
-     * @zh
-     * 灯光索引偏移量数组。
-     */
     private _lightIndexOffset: number[];
-
-    /**
-     * @zh
-     * 灯光索引数组。
-     */
     private _lightIndices: number[];
-
-    /**
-     * @zh
-     * 灯光GFXbuffer数组。
-     */
     private _lightBuffers: GFXBuffer[] = [];
 
-    /**
-     * 构造函数。
-     * @param root Root类实例。
-     */
     constructor () {
         super();
         this._validLights = [];
@@ -125,8 +106,8 @@ export class ForwardPipeline extends RenderPipeline {
         this._flows.push(forwardFlow);
     }
 
-    public activate (root: Root): boolean {
-        if (!super.activate(root)) {
+    public activate (): boolean {
+        if (!super.activate()) {
             return false;
         }
 
@@ -153,29 +134,10 @@ export class ForwardPipeline extends RenderPipeline {
         return true;
     }
 
-    /**
-     * @zh
-     * 销毁函数。
-     */
     public destroy () {
         this._destroy();
     }
 
-    /**
-     * @zh
-     * 重构函数。
-     */
-    public rebuild () {
-        super.rebuild();
-        for (let i = 0; i < this._flows.length; i++) {
-            this._flows[i].rebuild();
-        }
-    }
-
-    /**
-     * @zh
-     * 更新UBO。
-     */
     public updateUBOs (view: RenderView) {
         super.updateUBOs(view);
 
@@ -247,11 +209,6 @@ export class ForwardPipeline extends RenderPipeline {
         }
     }
 
-    /**
-     * @zh
-     * 场景裁剪。
-     * @param view 渲染视图。
-     */
     public sceneCulling (view: RenderView) {
         super.sceneCulling(view);
         this._validLights.length = 0;
@@ -277,7 +234,7 @@ export class ForwardPipeline extends RenderPipeline {
 
         if (this._validLights.length > this._lightBuffers.length) {
             for (let l = this._lightBuffers.length; l < this._validLights.length; ++l) {
-                const lightBuffer: GFXBuffer = this._device.createBuffer({
+                const lightBuffer: GFXBuffer = PipelineGlobal.device.createBuffer({
                     usage: GFXBufferUsageBit.UNIFORM | GFXBufferUsageBit.TRANSFER_DST,
                     memUsage: GFXMemoryUsageBit.HOST | GFXMemoryUsageBit.DEVICE,
                     size: UBOForwardLight.SIZE,
@@ -296,11 +253,7 @@ export class ForwardPipeline extends RenderPipeline {
         }
     }
 
-    /**
-     * @zh
-     * 对每个模型裁剪光源。
-     * @param model 模型。
-     */
+    // Cull light for the model
     private cullLightPerModel (model: Model) {
         if (model.node) {
             model.node.getWorldPosition(_tempVec3);

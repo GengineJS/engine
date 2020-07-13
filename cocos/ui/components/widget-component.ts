@@ -46,7 +46,7 @@ import { legacyCC } from '../../core/global-exports';
 const _zeroVec3 = new Vec3();
 
 // returns a readonly size of the node
-export function getReadonlyNodeSize (parent: Node) {
+export function getReadonlyNodeSize (parent: Node | Scene) {
     if (parent instanceof Scene) {
         // @ts-ignore
         if (EDITOR) {
@@ -1086,7 +1086,7 @@ export class WidgetComponent extends Component {
     }
 }
 
-export namespace WidgetComponent {
+export declare namespace WidgetComponent {
     export type AlignMode = EnumAlias<typeof AlignMode>;
 }
 

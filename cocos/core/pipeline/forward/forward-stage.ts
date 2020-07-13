@@ -1,10 +1,10 @@
 /**
- * @category pipeline.forward
+ * @category pipeline
  */
 
 import { ccclass } from '../../data/class-decorator';
 import { GFXCommandBuffer } from '../../gfx/command-buffer';
-import { GFXClearFlag, GFXFilter, IGFXColor } from '../../gfx/define';
+import { GFXClearFlag, GFXFilter, IGFXColor, GFXLoadOp, GFXTextureLayout } from '../../gfx/define';
 import { SRGBToLinear } from '../pipeline-funcs';
 import { RenderBatchedQueue } from '../render-batched-queue';
 import { RenderFlow } from '../render-flow';
@@ -13,13 +13,14 @@ import { IRenderStageInfo, RenderQueueSortMode, RenderStage } from '../render-st
 import { RenderView } from '../render-view';
 import { ForwardStagePriority } from './enum';
 import { RenderAdditiveLightQueue } from '../render-additive-light-queue';
+import { PipelineGlobal } from '../global';
 
 const colors: IGFXColor[] = [ { r: 0, g: 0, b: 0, a: 1 } ];
 const bufs: GFXCommandBuffer[] = [];
 
 /**
- * @zh
- * 前向渲染阶段。
+ * @en The forward render stage
+ * @zh 前向渲染阶段。
  */
 @ccclass('ForwardStage')
 export class ForwardStage extends RenderStage {
@@ -45,10 +46,6 @@ export class ForwardStage extends RenderStage {
     private _instancedQueue: RenderInstancedQueue;
     private _additiveLightQueue: RenderAdditiveLightQueue;
 
-    /**
-     * 构造函数。
-     * @param flow 渲染阶段。
-     */
     constructor () {
         super();
         this._batchedQueue = new RenderBatchedQueue();
@@ -61,10 +58,6 @@ export class ForwardStage extends RenderStage {
         this.createCmdBuffer();
     }
 
-    /**
-     * @zh
-     * 销毁函数。
-     */
     public destroy () {
         if (this._cmdBuff) {
             this._cmdBuff.destroy();
@@ -72,27 +65,12 @@ export class ForwardStage extends RenderStage {
         }
     }
 
-    /**
-     * @zh
-     * 重置大小。
-     * @param width 屏幕宽度。
-     * @param height 屏幕高度。
-     */
     public resize (width: number, height: number) {
     }
 
-    /**
-     * @zh
-     * 重构函数。
-     */
     public rebuild () {
     }
 
-    /**
-     * @zh
-     * 渲染函数。
-     * @param view 渲染视图。
-     */
     public render (view: RenderView) {
 
         this._instancedQueue.clear();
@@ -170,22 +148,21 @@ export class ForwardStage extends RenderStage {
 
         colors[0].a = camera.clearColor.a;
 
+        let framebuffer = view.window.framebuffer;
         if (this._pipeline.usePostProcess) {
             if (!this._pipeline.useMSAA) {
-                this._framebuffer = this._pipeline.getFrameBuffer(this._pipeline!.currShading)!;
+                framebuffer = this._pipeline.getFrameBuffer(this._pipeline!.currShading)!;
             } else {
-                this._framebuffer = this._pipeline.getFrameBuffer('msaa')!;
+                framebuffer = this._pipeline.getFrameBuffer('msaa')!;
             }
-        } else {
-            this._framebuffer = view.window!.framebuffer;
         }
 
-        const device = this._device!;
-        const renderPass = this._framebuffer.renderPass!;
+        const device = PipelineGlobal.device;
+        const renderPass = framebuffer.colorTextures[0] ? framebuffer.renderPass : this._flow.getRenderPass(camera.clearFlag);
 
         cmdBuff.begin();
-        cmdBuff.beginRenderPass(this._framebuffer, this._renderArea!,
-            camera.clearFlag, colors, camera.clearDepth, camera.clearStencil);
+        cmdBuff.beginRenderPass(renderPass, framebuffer, this._renderArea!,
+            colors, camera.clearDepth, camera.clearStencil);
 
         this._renderQueues[0].recordCommandBuffer(device, renderPass, cmdBuff);
         this._instancedQueue.recordCommandBuffer(device, renderPass, cmdBuff);
@@ -198,10 +175,10 @@ export class ForwardStage extends RenderStage {
         cmdBuff.end();
 
         bufs[0] = cmdBuff;
-        this._device!.queue.submit(bufs);
+        device.queue.submit(bufs);
 
         if (this._pipeline.useMSAA) {
-            this._device!.blitFramebuffer(
+            device.blitFramebuffer(
                 this._framebuffer!,
                 this._pipeline.getFrameBuffer(this._pipeline.currShading)!,
                 this._renderArea!,

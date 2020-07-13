@@ -48,6 +48,7 @@ import { js } from './utils';
 import { DEBUG, EDITOR, BUILD } from 'internal:constants';
 import { legacyCC } from './global-exports';
 import { errorID, error, logID, assertID } from './platform/debug';
+import { PipelineGlobal } from './pipeline/global';
 
 // ----------------------------------------------------------------------------------------------------------------------
 
@@ -302,10 +303,6 @@ export class Director extends EventTarget {
         this._nodeActivator = new NodeActivator();
 
         this._systems = [];
-
-        legacyCC.game.on(Game.EVENT_SHOW, () => {
-            this._lastUpdate = performance.now();
-        });
 
         legacyCC.game.once(Game.EVENT_RENDERER_INITED, this._initOnRendererInitialized, this);
     }
@@ -1083,6 +1080,8 @@ export class Director extends EventTarget {
     private _init () {
         legacyCC.loader.init(this);
         this._root = new Root(legacyCC.game._gfxDevice);
+        PipelineGlobal.root = this._root;
+        PipelineGlobal.device = this.root!.device;
         const rootInfo = {};
         if (!this._root.initialize(rootInfo)) {
             errorID(1217);

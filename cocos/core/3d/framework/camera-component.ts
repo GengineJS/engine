@@ -66,7 +66,7 @@ const ClearFlag = Enum({
 });
 
 // tslint:disable: no-shadowed-variable
-export namespace CameraComponent {
+export declare namespace CameraComponent {
     export type ProjectionType = EnumAlias<typeof ProjectionType>;
     export type FOVAxis = EnumAlias<typeof FOVAxis>;
     export type ClearFlag = EnumAlias<typeof ClearFlag>;
@@ -657,7 +657,7 @@ export class CameraComponent extends Component {
         }
 
         if (this._targetTexture) {
-            const window = this._targetTexture.getGFXWindow();
+            const window = this._targetTexture.window;
             this._camera.changeTargetWindow(window);
             this._camera.setFixedSize(window!.width, window!.height);
         }
