@@ -349,14 +349,14 @@ export class PageViewComponent extends ScrollViewComponent {
 
     public onEnable() {
         super.onEnable();
-        if (!EDITOR || (EDITOR && legacyCC.engine.isPlaying)) {
+        if (!EDITOR || legacyCC.engine.isPlaying) {
             this.node.on(PageViewComponent.EventType.SCROLL_ENG_WITH_THRESHOLD, this._dispatchPageTurningEvent, this);
         }
     }
 
     public onDisable() {
         super.onDisable();
-        if (!EDITOR || (EDITOR && legacyCC.engine.isPlaying)) {
+        if (!EDITOR || legacyCC.engine.isPlaying) {
             this.node.off(PageViewComponent.EventType.SCROLL_ENG_WITH_THRESHOLD, this._dispatchPageTurningEvent, this);
         }
     }
