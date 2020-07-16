@@ -230,7 +230,7 @@ export class SystemEvent extends EventTarget {
      * @param target - The target (this object) to invoke the callback, if it's not given, only callback without target will be removed
      */
     public off (type: string, callback?: Function, target?: Object) {
-        if (EDITOR) {
+        if (EDITOR && !legacyCC.engine.isPlaying) {
             return;
         }
         super.off(type, callback, target);
