@@ -662,7 +662,7 @@ export class ParticleSystem2D extends UIRenderable {
     public aspectRatio: number = 1;
     // The temporary SpriteFrame object used for the renderer. Because there is no corresponding asset, it can't be serialized.
     public declare _renderSpriteFrame: SpriteFrame | null;
-    private declare _simulator: Simulator;
+    public declare _simulator: Simulator;
     private declare _previewTimer;
     private declare _focused: boolean;
     private declare _plistFile;
@@ -800,7 +800,7 @@ bv
         }
 
         if (this._assembler && this._assembler.createData){
-            this._assembler.createData(this);
+            this._simulator.renderData = this._assembler.createData(this);
         }
     }
 
@@ -1023,7 +1023,7 @@ bv
 
         // position
         // Make empty positionType value and old version compatible
-        this.positionType = parseFloat(dict['positionType'] !== undefined ? dict['positionType'] : PositionType.RELATIVE);
+        this.positionType = parseFloat(dict['positionType'] !== undefined ? dict['positionType'] : PositionType.FREE);
         // for
         this.sourcePos.set(0, 0)
         this.posVar.set(parseFloat(dict["sourcePositionVariancex"] || 0), parseFloat(dict["sourcePositionVariancey"] || 0));
