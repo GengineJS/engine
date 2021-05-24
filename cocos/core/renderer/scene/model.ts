@@ -339,9 +339,6 @@ export class Model {
         // @ts-expect-error TS2445
         if (node.hasChangedFlags || node._dirtyFlags) {
             node.updateWorldTransform();
-            if (JSB) {
-                node.native.updateWorldTransform();
-            }
             this._transformUpdated = true;
             const worldBounds = this._worldBounds;
             if (this._modelBounds && worldBounds) {
@@ -356,9 +353,6 @@ export class Model {
         const node = this.transform;
         if (node !== null) {
             node.updateWorldTransform();
-            if (JSB) {
-                node.native.updateWorldTransform();
-            }
             this._transformUpdated = true;
             const worldBounds = this._worldBounds;
             if (this._modelBounds && worldBounds) {
@@ -543,6 +537,7 @@ export class Model {
         }
     }
 
+    // TODO
     // private _updateNativeInstanceAttribute (size: number, ele: any) {
     //     if (JSB) {
     //         this.native.getInstancedAttributeBlock().resize

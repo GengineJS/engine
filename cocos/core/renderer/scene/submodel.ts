@@ -239,9 +239,6 @@ export class SubModel {
              pass.update();
          }
          this._descriptorSet!.update();
-         if (JSB) {
-             this.native.update();
-         }
      }
 
      public onPipelineStateChanged (): void {

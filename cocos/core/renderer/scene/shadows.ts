@@ -444,7 +444,7 @@ export class Shadows {
             this._material.initialize({ effectName: 'planar-shadow' });
             if (JSB) {
                 ShadowsPool.set(this._handle, ShadowsView.PLANAR_PASS, this._material.passes[0].handle);
-                this._nativeObj.planarPass = this._material.passes[0].handle;
+                this._nativeObj.planarPass = this._material.passes[0].native;
             }
         }
 
@@ -523,7 +523,7 @@ export class Shadows {
             this._material.initialize({ effectName: 'planar-shadow' });
             if (JSB) {
                 ShadowsPool.set(this._handle, ShadowsView.PLANAR_PASS, this._material.passes[0].handle);
-                this._nativeObj.planarPass = this._material.passes[0].handle;
+                this._nativeObj.planarPass = this._material.passes[0].native;
             }
         }
         if (!this._instancingMaterial) {

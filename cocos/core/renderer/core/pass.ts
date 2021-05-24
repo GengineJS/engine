@@ -30,6 +30,7 @@
 
 import { EDITOR, JSB } from 'internal:constants';
 import { notStrictEqual } from 'assert';
+import { Hash } from 'crypto';
 import { Root } from '../../root';
 import { TextureBase } from '../../assets/texture-base';
 import { builtinResMgr } from '../../builtin/builtin-res-mgr';
@@ -222,6 +223,19 @@ export class Pass {
 
     protected _nativeObj: any;
 
+    protected _priority: RenderPriority = RenderPriority.DEFAULT;
+
+    protected _stage: RenderPassStage = RenderPassStage.DEFAULT;
+
+    protected _phase = -1;
+
+    protected _primitive: PrimitiveMode = PrimitiveMode.TRIANGLE_LIST;
+
+    protected _batchingScheme: BatchingSchemes = BatchingSchemes.INSTANCING;
+
+    protected _dynamicStates: DynamicStateFlagBit = DynamicStateFlagBit.NONE;
+
+    protected _hash = 0;
     get native (): any {
         return this._nativeObj;
     }
@@ -561,6 +575,7 @@ export class Pass {
     public endChangeStatesSilently (): void {}
 
     private _setPriority (val:RenderPriority) {
+        this._priority = val;
         PassPool.set(this._handle, PassView.PRIORITY, val);
         if (JSB) {
             this.native.setPriority(val);
@@ -568,6 +583,7 @@ export class Pass {
     }
 
     private _setStage (val: RenderPassStage) {
+        this._stage = val;
         PassPool.set(this._handle, PassView.STAGE, val);
         if (JSB) {
             this.native.setStage(val);
@@ -575,6 +591,7 @@ export class Pass {
     }
 
     private _setPhase (val: number) {
+        this._phase = val;
         PassPool.set(this._handle, PassView.PHASE, val);
         if (JSB) {
             this.native.setPhase(val);
@@ -582,6 +599,7 @@ export class Pass {
     }
 
     private _setPrimitive (val: PrimitiveMode) {
+        this._primitive = val;
         PassPool.set(this._handle, PassView.PRIMITIVE, val);
         if (JSB) {
             this.native.setPrimitive(val);
@@ -711,6 +729,7 @@ export class Pass {
     }
 
     private _setBatchingScheme (val: BatchingSchemes) {
+        this._batchingScheme = val;
         PassPool.set(this.handle, PassView.BATCHING_SCHEME, val);
         if (JSB) {
             this.native.setBatchingScheme(val);
@@ -718,6 +737,7 @@ export class Pass {
     }
 
     private _setDynamicState (val: DynamicStateFlagBit) {
+        this._dynamicStates = val;
         PassPool.set(this.handle, PassView.DYNAMIC_STATES, val);
         if (JSB) {
             this.native.setDynamicState(val);
@@ -733,6 +753,7 @@ export class Pass {
     }
 
     private _setHash (val: number) {
+        this._hash = val;
         PassPool.set(this._handle, PassView.HASH, val);
     }
 
@@ -783,17 +804,17 @@ export class Pass {
     get blocks (): Float32Array[] { return this._blocks; }
     // states
     get handle (): PassHandle { return this._handle; }
-    get priority (): RenderPriority { return PassPool.get(this._handle, PassView.PRIORITY); }
-    get primitive (): PrimitiveMode { return PassPool.get(this._handle, PassView.PRIMITIVE); }
-    get stage (): RenderPassStage { return PassPool.get(this._handle, PassView.STAGE); }
-    get phase (): number { return PassPool.get(this._handle, PassView.PHASE); }
+    get priority (): RenderPriority { return this._priority; }
+    get primitive (): PrimitiveMode { return this._primitive; }
+    get stage (): RenderPassStage { return this._stage; }
+    get phase (): number { return this._phase; }
     get rasterizerState (): RasterizerState { return this._rs; }
     get depthStencilState (): DepthStencilState { return this._dss; }
     get blendState (): BlendState { return this._bs; }
-    get dynamicStates (): DynamicStateFlags { return PassPool.get(this._handle, PassView.DYNAMIC_STATES); }
-    get batchingScheme (): BatchingSchemes { return PassPool.get(this._handle, PassView.BATCHING_SCHEME); }
+    get dynamicStates (): DynamicStateFlags { return this._dynamicStates; }
+    get batchingScheme (): BatchingSchemes { return this._batchingScheme; }
     get descriptorSet (): DescriptorSet { return this._descriptorSet; }
-    get hash (): number { return PassPool.get(this._handle, PassView.HASH); }
+    get hash (): number { return this._hash; }
     get rootBufferDirty (): boolean { return this._rootBufferDirty; }
 }
 

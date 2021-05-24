@@ -313,4 +313,14 @@ export class AABB {
     public copy (a: AABB): AABB {
         return AABB.copy(this, a);
     }
+
+    private _destroy () {
+        if (JSB) {
+            this._nativeObj = null;
+        }
+    }
+
+    public destroy () {
+        this._destroy();
+    }
 }
