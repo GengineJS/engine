@@ -409,8 +409,7 @@ export class Model {
             }
             AABBPool.setVec3(this._hWorldBounds, AABBView.CENTER, this._worldBounds!.center);
             AABBPool.setVec3(this._hWorldBounds, AABBView.HALF_EXTENSION, this._worldBounds!.halfExtents);
-            this._nativeObj.setWolrdBounds(this._worldBounds!.native);
-            this._nativeObj.setModelBounds(this._modelBounds!.native);
+            this._nativeObj.setWolrdBounds(this._worldBounds);
         }
     }
 

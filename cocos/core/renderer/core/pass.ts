@@ -576,56 +576,56 @@ export class Pass {
 
     private _setPriority (val:RenderPriority) {
         this._priority = val;
-        PassPool.set(this._handle, PassView.PRIORITY, val);
         if (JSB) {
+            PassPool.set(this._handle, PassView.PRIORITY, val);
             this.native.setPriority(val);
         }
     }
 
     private _setStage (val: RenderPassStage) {
         this._stage = val;
-        PassPool.set(this._handle, PassView.STAGE, val);
         if (JSB) {
+            PassPool.set(this._handle, PassView.STAGE, val);
             this.native.setStage(val);
         }
     }
 
     private _setPhase (val: number) {
         this._phase = val;
-        PassPool.set(this._handle, PassView.PHASE, val);
         if (JSB) {
+            PassPool.set(this._handle, PassView.PHASE, val);
             this.native.setPhase(val);
         }
     }
 
     private _setPrimitive (val: PrimitiveMode) {
         this._primitive = val;
-        PassPool.set(this._handle, PassView.PRIMITIVE, val);
         if (JSB) {
+            PassPool.set(this._handle, PassView.PRIMITIVE, val);
             this.native.setPrimitive(val);
         }
     }
 
     private _setRasterizerState (val: RasterizerState) {
         this._rs = val;
-        PassPool.set(this._handle, PassView.RASTERIZER_STATE, val.handle);
         if (JSB) {
+            PassPool.set(this._handle, PassView.RASTERIZER_STATE, val.handle);
             this.native.setRasterizerState(val);
         }
     }
 
     private _setDepthStencilState (val: DepthStencilState) {
         this._dss = val;
-        PassPool.set(this._handle, PassView.DEPTH_STENCIL_STATE, val.handle);
         if (JSB) {
+            PassPool.set(this._handle, PassView.DEPTH_STENCIL_STATE, val.handle);
             this.native.setDepthStencilState(val);
         }
     }
 
     private _setBlendState (val: BlendState) {
         this._bs = val;
-        PassPool.set(this._handle, PassView.BLEND_STATE, val.handle);
         if (JSB) {
+            PassPool.set(this._handle, PassView.BLEND_STATE, val.handle);
             this.native.setBlendState(val);
         }
     }
@@ -730,16 +730,16 @@ export class Pass {
 
     private _setBatchingScheme (val: BatchingSchemes) {
         this._batchingScheme = val;
-        PassPool.set(this.handle, PassView.BATCHING_SCHEME, val);
         if (JSB) {
+            PassPool.set(this.handle, PassView.BATCHING_SCHEME, val);
             this.native.setBatchingScheme(val);
         }
     }
 
     private _setDynamicState (val: DynamicStateFlagBit) {
         this._dynamicStates = val;
-        PassPool.set(this.handle, PassView.DYNAMIC_STATES, val);
         if (JSB) {
+            PassPool.set(this.handle, PassView.DYNAMIC_STATES, val);
             this.native.setDynamicState(val);
         }
     }
