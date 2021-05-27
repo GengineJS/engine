@@ -43,7 +43,7 @@ import {
     DescriptorSetInfo, DescriptorSetLayout, Device, RasterizerState, Sampler, Texture,
 } from '../../gfx';
 import {
-    DSPool, NULL_HANDLE, PassHandle, PassPool, PassView, ShaderHandle,
+    DSPool, NULL_HANDLE, PassHandle, PassPool, PassView, PipelineLayoutPool, ShaderHandle,
 } from './memory-pools';
 import { IPassInfo, IPassStates, IPropertyInfo } from '../../assets/effect-asset';
 import { IProgramInfo, programLib } from './program-lib';
@@ -52,6 +52,7 @@ import {
     getBindingFromHandle, getDefaultFromType, getOffsetFromHandle, getPropertyTypeFromHandle, getTypeFromHandle, type2reader, type2writer,
 } from './pass-utils';
 import { RenderPassStage, RenderPriority } from '../../pipeline/define';
+import { PipelineLayoutHandle } from '..';
 
 export interface IPassInfoFull extends IPassInfo {
     // generated part
@@ -519,7 +520,7 @@ export class Pass {
         this._syncBatchingScheme();
         this._hShaderDefault = programLib.getGFXShader(this._device, this._programName, this._defines, pipeline);
         if (!this._hShaderDefault) { console.warn(`create shader ${this._programName} failed`); return false; }
-        PassPool.set(this._handle, PassView.PIPELINE_LAYOUT, programLib.getTemplateInfo(this._programName).hPipelineLayout);
+        this._setNativePipelineLayout(programLib.getTemplateInfo(this._programName).hPipelineLayout);
         this._setHash(Pass.getPassHash(this, this._hShaderDefault));
         return true;
     }
@@ -610,7 +611,7 @@ export class Pass {
         this._rs = val;
         if (JSB) {
             PassPool.set(this._handle, PassView.RASTERIZER_STATE, val.handle);
-            this.native.setRasterizerState(val);
+            this.native.setRasterizerState(val.native);
         }
     }
 
@@ -618,7 +619,7 @@ export class Pass {
         this._dss = val;
         if (JSB) {
             PassPool.set(this._handle, PassView.DEPTH_STENCIL_STATE, val.handle);
-            this.native.setDepthStencilState(val);
+            this.native.setDepthStencilState(val.native);
         }
     }
 
@@ -626,7 +627,13 @@ export class Pass {
         this._bs = val;
         if (JSB) {
             PassPool.set(this._handle, PassView.BLEND_STATE, val.handle);
-            this.native.setBlendState(val);
+            this.native.setBlendState(val.native);
+        }
+    }
+
+    private _setNativeDescriptorSet (val: DescriptorSet) {
+        if (JSB) {
+            this.native.setDescriptorSet(val);
         }
     }
 
@@ -659,7 +666,7 @@ export class Pass {
         const dsHandle = DSPool.alloc(this._device, _dsInfo);
         PassPool.set(this._handle, PassView.DESCRIPTOR_SET, dsHandle);
         this._descriptorSet = DSPool.get(dsHandle);
-
+        this._setNativeDescriptorSet(this._descriptorSet);
         // calculate total size required
         const blocks = this._shaderInfo.blocks;
         const tmplInfo = programLib.getTemplateInfo(info.program);
@@ -746,15 +753,25 @@ export class Pass {
 
     private _setDescriptorSet (target: Pass, val: DescriptorSet) {
         this._descriptorSet = target.descriptorSet;
-        PassPool.set(this.handle, PassView.DESCRIPTOR_SET, PassPool.get(target.handle, PassView.DESCRIPTOR_SET));
+        const descriptorSetHandle = PassPool.get(target.handle, PassView.DESCRIPTOR_SET);
+        PassPool.set(this.handle, PassView.DESCRIPTOR_SET, descriptorSetHandle);
+        this._setNativeDescriptorSet(this._descriptorSet);
+    }
+
+    protected _setHash (val: number) {
+        this._hash = val;
         if (JSB) {
-            this.native.setDescriptorSet(val);
+            PassPool.set(this._handle, PassView.HASH, val);
+            this.native.setHash(val);
         }
     }
 
-    private _setHash (val: number) {
-        this._hash = val;
-        PassPool.set(this._handle, PassView.HASH, val);
+    private _setNativePipelineLayout (layoutHandle: PipelineLayoutHandle) {
+        PassPool.set(this._handle, PassView.PIPELINE_LAYOUT, layoutHandle);
+        if (JSB) {
+            const pipelineLayout = PipelineLayoutPool.get(layoutHandle);
+            this.native.setPipelineLayout(pipelineLayout);
+        }
     }
 
     // Only for UI
@@ -783,8 +800,7 @@ export class Pass {
 
         this._hShaderDefault = target._hShaderDefault;
 
-        PassPool.set(this._handle, PassView.PIPELINE_LAYOUT, programLib.getTemplateInfo(this._programName).hPipelineLayout);
-
+        this._setNativePipelineLayout(programLib.getTemplateInfo(this._programName).hPipelineLayout);
         const hash = PassPool.get(target.handle, PassView.HASH);
         this._setHash(hash ^ hashFactor);
     }

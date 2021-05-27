@@ -166,6 +166,7 @@ export class SubModel {
          this._subMesh = subMesh;
          if (JSB) {
              SubModelPool.set(this._handle, SubModelView.SUB_MESH, subMesh.handle);
+             this.native.setRenderingSubMesh(subMesh.flatBuffers);
          }
      }
 
