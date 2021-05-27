@@ -29,8 +29,6 @@
  */
 
 import { EDITOR, JSB } from 'internal:constants';
-import { notStrictEqual } from 'assert';
-import { Hash } from 'crypto';
 import { Root } from '../../root';
 import { TextureBase } from '../../assets/texture-base';
 import { builtinResMgr } from '../../builtin/builtin-res-mgr';
@@ -53,6 +51,7 @@ import {
 } from './pass-utils';
 import { RenderPassStage, RenderPriority } from '../../pipeline/define';
 import { PipelineLayoutHandle } from '..';
+import { NativePass } from '../scene';
 
 export interface IPassInfoFull extends IPassInfo {
     // generated part
@@ -222,7 +221,7 @@ export class Pass {
 
     protected _rs: RasterizerState = new RasterizerState();
 
-    protected _nativeObj: any;
+    protected declare _nativeObj: NativePass | null;
 
     protected _priority: RenderPriority = RenderPriority.DEFAULT;
 
@@ -237,8 +236,8 @@ export class Pass {
     protected _dynamicStates: DynamicStateFlagBit = DynamicStateFlagBit.NONE;
 
     protected _hash = 0;
-    get native (): any {
-        return this._nativeObj;
+    get native (): NativePass {
+        return this._nativeObj!;
     }
 
     constructor (root: Root) {
@@ -640,7 +639,7 @@ export class Pass {
     protected _doInit (info: IPassInfoFull, copyDefines = false): void {
         const handle = this._handle = PassPool.alloc();
         if (JSB) {
-            this._nativeObj = new ns.Pass();
+            this._nativeObj = new NativePass();
         }
         this._setPriority(RenderPriority.DEFAULT);
         this._setStage(RenderPassStage.DEFAULT);
