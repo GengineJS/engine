@@ -148,10 +148,6 @@ function _onLoadInEditor (comp) {
             callOnLostFocusInTryCatch(comp);
         }
     }
-    if (!TEST) {
-        // @ts-expect-error
-        _Scene.AssetsWatcher.start(comp);
-    }
 }
 
 /**
