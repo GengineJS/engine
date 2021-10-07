@@ -29,6 +29,7 @@
  */
 
 import { JSB } from 'internal:constants';
+import { screenAdapter } from 'pal/screen-adapter';
 import { builtinResMgr } from './builtin';
 import { Pool } from './memop';
 import { RenderPipeline, createDefaultPipeline, DeferredPipeline } from './pipeline';
@@ -323,6 +324,9 @@ export class Root {
      * @param height 屏幕高度
      */
     public resize (width: number, height: number) {
+        if (JSB) {
+            this._pipeline!.pipelineSceneData.shadingScale =  width / screenAdapter.windowSize.width;
+        }
         for (const window of this._windows) {
             if (window.swapchain) {
                 window.resize(width, height);
