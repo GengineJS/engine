@@ -534,7 +534,7 @@ class RasterPassInfo {
             rasterView.slotName = currRasterView.slotName;
             rasterView.accessType = currRasterView.accessType;
             rasterView.attachmentType = currRasterView.attachmentType;
-            rasterView.loadOp = currRasterView.loadOp;
+            rasterView.loadOp = currRasterView.loadOp ? LoadOp.CLEAR : LoadOp.LOAD;
             rasterView.storeOp = currRasterView.storeOp;
             rasterView.clearFlags = currRasterView.clearFlags;
             rasterView.slotID = currRasterView.slotID;

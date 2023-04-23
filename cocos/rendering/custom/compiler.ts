@@ -143,6 +143,7 @@ class PassVisitor implements RenderGraphVisitor {
                     let resUseContext = resContext.get(computeName);
                     if (!resUseContext) {
                         resUseContext = new ResourceUseContext();
+                        resContext.set(computeName, resUseContext);
                     }
                     const computes = resUseContext.computes;
                     if (!computes) {
@@ -269,9 +270,12 @@ class CompilerContext {
             this.resourceContext = new Map<string, ResourceUseContext>();
         }
         this.resourceContext.clear();
+        if (!this.pipeline.resourceContext) {
+            this.pipeline.resourceContext = this.resourceContext;
+        }
     }
     resourceGraph!: ResourceGraph;
-    pipeline!: Pipeline;
+    pipeline;
     renderGraph!: RenderGraph;
     layoutGraph!: LayoutGraphData;
     resourceContext!: Map<string, ResourceUseContext>;

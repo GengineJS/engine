@@ -1748,6 +1748,13 @@ export class WebPipeline implements Pipeline {
         return this._layoutGraph;
     }
 
+    set resourceContext (value) {
+        this._resourceContext = value;
+    }
+    get resourceContext () {
+        return this._resourceContext;
+    }
+
     protected _updateRasterPassConstants (setter: WebSetter, width: number, height: number, layoutName = 'default') {
         const director = cclegacy.director;
         const root = director.root;
@@ -1806,6 +1813,7 @@ export class WebPipeline implements Pipeline {
     private _profiler: Model | null = null;
     private _pipelineUBO: PipelineUBO = new PipelineUBO();
     private _cameras: Camera[] = [];
+    private _resourceContext = null;
 
     private _layoutGraph: LayoutGraphData;
     private readonly _resourceGraph: ResourceGraph = new ResourceGraph();
