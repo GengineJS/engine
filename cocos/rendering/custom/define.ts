@@ -574,6 +574,7 @@ export function buildShadowPass (passName: Readonly<string>,
     queue.addSceneOfCamera(camera, new LightInfo(light, level),
         SceneFlags.SHADOW_CASTER);
     validShadowNames.push(shadowMapName);
+    return { pass, queue };
 }
 
 export function buildReflectionProbePasss (camera: Camera,
@@ -668,10 +669,15 @@ export function buildShadowPasses (cameraName: string, camera: Camera, ppl: Pipe
                 camera, mainLight, 0, mapWidth, mapHeight);
         } else {
             const csmLevel = pipeline.pipelineSceneData.csmSupported ? mainLight.csmLevel : 1;
+            let csmPassInfo;
             for (let i = 0; i < csmLevel; i++) {
                 cameraInfo.mainLightShadowNames[i] = `MainLightShadow${cameraName}`;
-                buildShadowPass(cameraInfo.mainLightShadowNames[i], ppl,
-                    camera, mainLight, i, mapWidth, mapHeight);
+                if (!csmPassInfo) {
+                    csmPassInfo = buildShadowPass(cameraInfo.mainLightShadowNames[i], ppl,
+                        camera, mainLight, i, mapWidth, mapHeight);
+                }
+                const area = getRenderArea(camera, mapWidth, mapHeight, mainLight, i);
+                csmPassInfo.queue.setViewPort(area.x, area.y, area.width, area.height);
             }
         }
     }
