@@ -27,13 +27,13 @@ import { BufferInfo, Buffer, BufferUsageBit, ClearFlagBit, Color, DescriptorSet,
     Format, Rect, Sampler, StoreOp, Texture, Viewport, MemoryUsageBit } from '../../gfx';
 import { Camera, CSMLevel, DirectionalLight, Light, LightType, ReflectionProbe, ShadowType, SKYBOX_FLAG, SpotLight } from '../../render-scene/scene';
 import { supportsR32FloatTexture } from '../define';
-import { Pipeline } from './pipeline';
+import { Pipeline, RasterPassBuilder } from './pipeline';
 import { AccessType, AttachmentType, ComputeView, LightInfo, QueueHint, RasterView, ResourceResidency, SceneFlags, UpdateFrequency } from './types';
 import { Vec4, macro, geometry, toRadian, cclegacy, assert } from '../../core';
 import { Material } from '../../asset/assets';
 import { getProfilerCamera, SRGBToLinear } from '../pipeline-funcs';
 import { RenderWindow } from '../../render-scene/core/render-window';
-import { RenderData } from './render-graph';
+import { RasterPass, RenderData } from './render-graph';
 import { WebPipeline } from './web-pipeline';
 import { DescriptorSetData } from './layout-graph';
 import { legacyCC } from '../../core/global-exports';
@@ -212,7 +212,7 @@ export function buildFxaaPass (camera: Camera,
     if (ppl.containsResource(inputRT)) {
         fxaaPass.addTexture(inputRT, 'sceneColorMap');
     }
-    fxaaPass.addRenderTarget(fxaaPassRTName, '_', LoadOp.DISCARD, StoreOp.STORE, clearColor);
+    fxaaPass.addRenderTarget(fxaaPassRTName, '_', LoadOp.CLEAR, StoreOp.STORE, clearColor);
     fxaaData.fxaaMaterial.setProperty('texSize', new Vec4(width, height, 1.0 / width, 1.0 / height), fxaaPassIdx);
     fxaaPass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
         camera, fxaaData.fxaaMaterial, fxaaPassIdx,
@@ -316,7 +316,7 @@ export function buildBloomPass (camera: Camera,
     if (ppl.containsResource(inputRT)) {
         bloomPrefilterPass.addTexture(inputRT, 'outputResultMap');
     }
-    bloomPrefilterPass.addRenderTarget(bloomPassPrefilterRTName, '_', LoadOp.DISCARD, StoreOp.STORE, bloomClearColor);
+    bloomPrefilterPass.addRenderTarget(bloomPassPrefilterRTName, '_', LoadOp.CLEAR, StoreOp.STORE, bloomClearColor);
     bloomData.bloomMaterial.setProperty('texSize', new Vec4(0, 0, bloomData.threshold, 0), 0);
     bloomPrefilterPass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
         camera, bloomData.bloomMaterial, 0,
@@ -343,7 +343,7 @@ export function buildBloomPass (camera: Camera,
         } else {
             bloomDownSamplePass.addTexture(`dsBloomPassDownSampleColor${cameraName}${i - 1}`, 'bloomTexture');
         }
-        bloomDownSamplePass.addRenderTarget(bloomPassDownSampleRTName, '_', LoadOp.DISCARD, StoreOp.STORE, bloomClearColor);
+        bloomDownSamplePass.addRenderTarget(bloomPassDownSampleRTName, '_', LoadOp.CLEAR, StoreOp.STORE, bloomClearColor);
         bloomData.bloomMaterial.setProperty('texSize', texSize, BLOOM_DOWNSAMPLEPASS_INDEX + i);
         bloomDownSamplePass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
             camera, bloomData.bloomMaterial, BLOOM_DOWNSAMPLEPASS_INDEX + i,
@@ -371,7 +371,7 @@ export function buildBloomPass (camera: Camera,
         } else {
             bloomUpSamplePass.addTexture(`dsBloomPassUpSampleColor${cameraName}${bloomData.iterations - i}`, 'bloomTexture');
         }
-        bloomUpSamplePass.addRenderTarget(bloomPassUpSampleRTName, '_', LoadOp.DISCARD, StoreOp.STORE, bloomClearColor);
+        bloomUpSamplePass.addRenderTarget(bloomPassUpSampleRTName, '_', LoadOp.CLEAR, StoreOp.STORE, bloomClearColor);
         bloomData.bloomMaterial.setProperty('texSize', texSize, BLOOM_UPSAMPLEPASS_INDEX + i);
         bloomUpSamplePass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
             camera, bloomData.bloomMaterial, BLOOM_UPSAMPLEPASS_INDEX + i,
@@ -395,7 +395,7 @@ export function buildBloomPass (camera: Camera,
     bloomCombinePass.setViewport(new Viewport(area.x, area.y, width, height));
     bloomCombinePass.addTexture(inputRT, 'outputResultMap');
     bloomCombinePass.addTexture(`dsBloomPassUpSampleColor${cameraName}${0}`, 'bloomTexture');
-    bloomCombinePass.addRenderTarget(bloomPassCombineRTName, '_', LoadOp.DISCARD, StoreOp.STORE, bloomClearColor);
+    bloomCombinePass.addRenderTarget(bloomPassCombineRTName, '_', LoadOp.CLEAR, StoreOp.STORE, bloomClearColor);
     bloomData.bloomMaterial.setProperty('texSize', new Vec4(0, 0, 0, bloomData.intensity), BLOOM_COMBINEPASS_INDEX);
     bloomCombinePass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
         camera, bloomData.bloomMaterial, BLOOM_COMBINEPASS_INDEX,
@@ -496,7 +496,7 @@ export function buildForwardPass (camera: Camera,
         if (!isOffScreen) {
             ppl.addRenderWindow(forwardPassRTName, Format.BGRA8, width, height, camera.window);
         } else {
-            ppl.addRenderTarget(forwardPassRTName, Format.RGBA16F, width, height, ResourceResidency.MANAGED);
+            ppl.addRenderTarget(forwardPassRTName, Format.RGBA16F, width, height, ResourceResidency.PERSISTENT);
         }
         ppl.addDepthStencil(forwardPassDSName, Format.DEPTH_STENCIL, width, height, ResourceResidency.MANAGED);
     }
@@ -521,12 +521,13 @@ export function buildForwardPass (camera: Camera,
         }
     }
     forwardPass.addRenderTarget(forwardPassRTName, '_',
-        isOffScreen ? LoadOp.DISCARD : getLoadOpOfClearFlag(camera.clearFlag, AttachmentType.RENDER_TARGET),
+        isOffScreen ? LoadOp.CLEAR : getLoadOpOfClearFlag(camera.clearFlag, AttachmentType.RENDER_TARGET),
         StoreOp.STORE,
         new Color(camera.clearColor.x, camera.clearColor.y, camera.clearColor.z, camera.clearColor.w));
     forwardPass.addDepthStencil(forwardPassDSName, '_',
-        isOffScreen ? LoadOp.DISCARD : getLoadOpOfClearFlag(camera.clearFlag, AttachmentType.DEPTH_STENCIL),
-        StoreOp.STORE,
+        isOffScreen ? LoadOp.CLEAR : getLoadOpOfClearFlag(camera.clearFlag, AttachmentType.DEPTH_STENCIL),
+        // If the depth texture is used by subsequent passes, it must be set to store.
+        isOffScreen ? StoreOp.DISCARD : StoreOp.STORE,
         camera.clearDepth,
         camera.clearStencil,
         camera.clearFlag);
@@ -669,15 +670,10 @@ export function buildShadowPasses (cameraName: string, camera: Camera, ppl: Pipe
                 camera, mainLight, 0, mapWidth, mapHeight);
         } else {
             const csmLevel = pipeline.pipelineSceneData.csmSupported ? mainLight.csmLevel : 1;
-            let csmPassInfo;
+            cameraInfo.mainLightShadowNames[0] = `MainLightShadow${cameraName}`;
             for (let i = 0; i < csmLevel; i++) {
-                cameraInfo.mainLightShadowNames[i] = `MainLightShadow${cameraName}`;
-                if (!csmPassInfo) {
-                    csmPassInfo = buildShadowPass(cameraInfo.mainLightShadowNames[i], ppl,
-                        camera, mainLight, i, mapWidth, mapHeight);
-                }
-                const area = getRenderArea(camera, mapWidth, mapHeight, mainLight, i);
-                csmPassInfo.queue.setViewPort(area.x, area.y, area.width, area.height);
+                buildShadowPass(cameraInfo.mainLightShadowNames[0], ppl,
+                    camera, mainLight, i, mapWidth, mapHeight);
             }
         }
     }
@@ -734,10 +730,10 @@ export function buildGBufferPass (camera: Camera,
             rtColor.z = camera.clearColor.z;
         }
     }
-    gBufferPass.addRenderTarget(gBufferPassRTName, '_', LoadOp.DISCARD, StoreOp.STORE, rtColor);
-    gBufferPass.addRenderTarget(gBufferPassNormal, '_', LoadOp.DISCARD, StoreOp.STORE, new Color(0, 0, 0, 0));
-    gBufferPass.addRenderTarget(gBufferPassEmissive, '_', LoadOp.DISCARD, StoreOp.STORE, new Color(0, 0, 0, 0));
-    gBufferPass.addDepthStencil(gBufferPassDSName, '_', LoadOp.DISCARD, StoreOp.STORE, camera.clearDepth, camera.clearStencil, camera.clearFlag);
+    gBufferPass.addRenderTarget(gBufferPassRTName, '_', LoadOp.CLEAR, StoreOp.STORE, rtColor);
+    gBufferPass.addRenderTarget(gBufferPassNormal, '_', LoadOp.CLEAR, StoreOp.STORE, new Color(0, 0, 0, 0));
+    gBufferPass.addRenderTarget(gBufferPassEmissive, '_', LoadOp.CLEAR, StoreOp.STORE, new Color(0, 0, 0, 0));
+    gBufferPass.addDepthStencil(gBufferPassDSName, '_', LoadOp.CLEAR, StoreOp.STORE, camera.clearDepth, camera.clearStencil, camera.clearFlag);
     gBufferPass
         .addQueue(QueueHint.RENDER_OPAQUE)
         .addSceneOfCamera(camera, new LightInfo(), SceneFlags.OPAQUE_OBJECT | SceneFlags.CUTOUT_OBJECT);
@@ -816,7 +812,7 @@ export function buildLightingPass (camera: Camera, ppl: Pipeline, gBuffer: GBuff
         lightingClearColor.z = camera.clearColor.z;
     }
     lightingClearColor.w = 0;
-    lightingPass.addRenderTarget(deferredLightingPassRTName, '_', LoadOp.DISCARD, StoreOp.STORE, lightingClearColor);
+    lightingPass.addRenderTarget(deferredLightingPassRTName, '_', LoadOp.CLEAR, StoreOp.STORE, lightingClearColor);
     lightingPass.addQueue(QueueHint.RENDER_TRANSPARENT).addCameraQuad(
         camera, lightingInfo.deferredLightingMaterial, 0,
         SceneFlags.VOLUMETRIC_LIGHTING,

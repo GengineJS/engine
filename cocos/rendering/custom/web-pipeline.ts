@@ -853,10 +853,7 @@ export class WebRasterQueueBuilder extends WebSetter implements RasterQueueBuild
         );
     }
     setViewport (viewport: Viewport) {
-        this._renderGraph.addVertex<RenderGraphValue.Viewport>(
-            RenderGraphValue.Viewport, viewport,
-            'Viewport', '', new RenderData(), false, this._vertID,
-        );
+        this._queue.viewport = new Viewport().copy(viewport);
     }
     addCustomCommand (customBehavior: string): void {
         throw new Error('Method not implemented.');
@@ -1748,11 +1745,8 @@ export class WebPipeline implements Pipeline {
         return this._layoutGraph;
     }
 
-    set resourceContext (value) {
-        this._resourceContext = value;
-    }
-    get resourceContext () {
-        return this._resourceContext;
+    get resourceUses () {
+        return this._resourceUses;
     }
 
     protected _updateRasterPassConstants (setter: WebSetter, width: number, height: number, layoutName = 'default') {
@@ -1813,7 +1807,7 @@ export class WebPipeline implements Pipeline {
     private _profiler: Model | null = null;
     private _pipelineUBO: PipelineUBO = new PipelineUBO();
     private _cameras: Camera[] = [];
-    private _resourceContext = null;
+    private _resourceUses: string[] = [];
 
     private _layoutGraph: LayoutGraphData;
     private readonly _resourceGraph: ResourceGraph = new ResourceGraph();
