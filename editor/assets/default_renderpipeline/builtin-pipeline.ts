@@ -393,7 +393,7 @@ export class BuiltinPipeline implements rendering.PipelineBuilder {
             : nativeHeight;
 
         // Render Window (UI)
-        ppl.addRenderWindow(window.colorName, Format.BGRA8, nativeWidth, nativeHeight, window);
+        ppl.addRenderWindow(window.colorName, Format.RGBA8, nativeWidth, nativeHeight, window);
 
         // Radiance
         if (this._configs.useFloatOutput) {
