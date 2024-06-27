@@ -176,6 +176,8 @@ export class TweenAction<T extends object> extends ActionInterval {
             }
 
             const prop = Object.create(null);
+            prop.start = prop.current = prop.end = null;
+            prop.keys = null;
             prop.value = customValue;
             prop.easing = customEasing;
             prop.progress = customProgress;
@@ -185,6 +187,9 @@ export class TweenAction<T extends object> extends ActionInterval {
             prop.sub = value.sub;
             prop.legacyProgress = value.legacyProgress ?? true;
             prop.toFixed = value.toFixed;
+            prop.onStart = value.onStart;
+            prop.onStop = value.onStop;
+            prop.onComplete = value.onComplete;
             prop.valid = true;
             this._props[name] = prop;
         }
@@ -242,7 +247,10 @@ export class TweenAction<T extends object> extends ActionInterval {
             } else if (typeof _t === 'object') {
                 if (prop.legacyProgress) {
                     if (prop.start == null) {
-                        prop.start = {}; prop.current = {}; prop.end = {};
+                        const Ctor = _t.constructor;
+                        prop.start = new Ctor();
+                        prop.current = new Ctor();
+                        prop.end = new Ctor();
                     }
 
                     let propertyKeys: string[];
@@ -251,6 +259,7 @@ export class TweenAction<T extends object> extends ActionInterval {
                     } else {
                         propertyKeys = Object.keys(value as object);
                     }
+                    prop.keys = propertyKeys;
 
                     for (let i = 0, len = propertyKeys.length; i < len; ++i) {
                         const k = propertyKeys[i];
@@ -317,9 +326,32 @@ export class TweenAction<T extends object> extends ActionInterval {
                 prop.current = _t;
                 prop.end = relative ? (reversed ? startNumValue - targetNumValue : startNumValue + targetNumValue) : targetNumValue;
             }
+
+            if (prop.onStart) {
+                prop.onStart({
+                    relative,
+                    reversed,
+                    start: prop.start,
+                    end: prop.end,
+                });
+            }
         }
 
         if (this._opts.onStart) { this._opts.onStart(workerTarget); }
+    }
+
+    stop (): void {
+        const props = this._props;
+        for (const name in props) {
+            const prop = props[name];
+            if (!prop.valid) continue;
+
+            if (prop.onStop) {
+                prop.onStop();
+            }
+        }
+
+        super.stop();
     }
 
     update (t: number): void {
@@ -349,7 +381,9 @@ export class TweenAction<T extends object> extends ActionInterval {
                 prop.current = interpolation(start, end, prop.current, time);
             } else if (typeof start === 'object') {
                 if (prop.legacyProgress) {
-                    for (const k in start) {
+                    const keys = prop.keys;
+                    for (let i = 0, len = keys.length; i < len; ++i) {
+                        const k = keys[i];
                         prop.current[k] = interpolation(start[k], end[k], prop.current[k], time);
                     }
                 } else {
@@ -367,6 +401,10 @@ export class TweenAction<T extends object> extends ActionInterval {
             }
 
             workerTarget[name] = prop.current;
+
+            if (t === 1 && prop.onComplete) {
+                prop.onComplete();
+            }
         }
         if (opts.onUpdate) { opts.onUpdate(workerTarget, t); }
         if (t === 1 && opts.onComplete) { opts.onComplete(workerTarget); }
