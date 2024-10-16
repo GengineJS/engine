@@ -525,7 +525,7 @@ class DeviceComputeQueue implements RecordingInterface {
     private _renderPhase: RenderPhaseData | null = null;
     private _descSetData: DescriptorSetData | null = null;
     private _layoutID = -1;
-    private _isUpdateUBO = false;
+    // private _isUpdateUBO = false;
     private _isUploadInstance = false;
     private _isUploadBatched = false;
     private _queueId = -1;
@@ -551,15 +551,15 @@ class DeviceComputeQueue implements RecordingInterface {
     get renderPhase (): RenderPhaseData | null { return this._renderPhase; }
     set queueId (val) { this._queueId = val; }
     get queueId (): number { return this._queueId; }
-    set isUpdateUBO (update: boolean) { this._isUpdateUBO = update; }
-    get isUpdateUBO (): boolean { return this._isUpdateUBO; }
+    // set isUpdateUBO (update: boolean) { this._isUpdateUBO = update; }
+    // get isUpdateUBO (): boolean { return this._isUpdateUBO; }
     set isUploadInstance (value: boolean) { this._isUploadInstance = value; }
     get isUploadInstance (): boolean { return this._isUploadInstance; }
     set isUploadBatched (value: boolean) { this._isUploadBatched = value; }
     get isUploadBatched (): boolean { return this._isUploadBatched; }
 
     reset (): void {
-        this._isUpdateUBO = false;
+        // this._isUpdateUBO = false;
         this._isUploadInstance = false;
         this._isUploadBatched = false;
     }
@@ -586,7 +586,7 @@ class DeviceRenderQueue implements RecordingInterface {
     private _viewport: Viewport | null = null;
     private _scissor: Rect | null = null;
     private _layoutID = -1;
-    private _isUpdateUBO = false;
+    // private _isUpdateUBO = false;
     private _isUploadInstance = false;
     private _isUploadBatched = false;
     get phaseID (): number { return this._phaseID; }
@@ -608,8 +608,8 @@ class DeviceRenderQueue implements RecordingInterface {
     private _queueId = -1;
     set queueId (val) { this._queueId = val; }
     get queueId (): number { return this._queueId; }
-    set isUpdateUBO (update: boolean) { this._isUpdateUBO = update; }
-    get isUpdateUBO (): boolean { return this._isUpdateUBO; }
+    // set isUpdateUBO (update: boolean) { this._isUpdateUBO = update; }
+    // get isUpdateUBO (): boolean { return this._isUpdateUBO; }
     set isUploadInstance (value: boolean) { this._isUploadInstance = value; }
     get isUploadInstance (): boolean { return this._isUploadInstance; }
     set isUploadBatched (value: boolean) { this._isUploadBatched = value; }
@@ -642,7 +642,7 @@ class DeviceRenderQueue implements RecordingInterface {
     }
     reset (): void {
         this._renderScenes.length = 0;
-        this._isUpdateUBO = false;
+        // this._isUpdateUBO = false;
         this._isUploadInstance = false;
         this._isUploadBatched = false;
         this._blitDesc?.reset();
@@ -743,7 +743,7 @@ const renderPassArea = new Rect();
 const resourceVisitor = new ResourceVisitor();
 class DeviceRenderPass implements RecordingInterface {
     protected _renderPass: RenderPass;
-    protected _framebuffer: Framebuffer;
+    protected _framebuffer!: Framebuffer;
     protected _clearColor: Color[] = [];
     protected _deviceQueues: Map<number, DeviceRenderQueue> = new Map();
     protected _clearDepth = 1;
@@ -1227,17 +1227,17 @@ class DeviceRenderScene implements RecordingInterface {
     }
 
     protected _recordUI (): void {
-        const devicePass = this._currentQueue.devicePass;
-        const rasterId = devicePass.rasterID;
-        const passRenderData = context.renderGraph.getData(rasterId);
-        // RasterPass first
-        this._updateGlobal(passRenderData, this.sceneID);
-        // then Queue
-        const queueId = this._currentQueue.queueId;
-        const queueRenderData = context.renderGraph.getData(queueId)!;
-        this._updateGlobal(queueRenderData, this.sceneID);
+        // const devicePass = this._currentQueue.devicePass;
+        // const rasterId = devicePass.rasterID;
+        // const passRenderData = context.renderGraph.getData(rasterId);
+        // // RasterPass first
+        // this._updateGlobal(passRenderData, this.sceneID);
+        // // then Queue
+        // const queueId = this._currentQueue.queueId;
+        // const queueRenderData = context.renderGraph.getData(queueId)!;
+        // this._updateGlobal(queueRenderData, this.sceneID);
 
-        this._currentQueue.isUpdateUBO = true;
+        // this._currentQueue.isUpdateUBO = true;
 
         const batches = this.camera!.scene!.batches;
         for (let i = 0; i < batches.length; i++) {
@@ -1302,7 +1302,7 @@ class DeviceRenderScene implements RecordingInterface {
     }
 
     protected _updateRenderData (): void {
-        if (this._currentQueue.isUpdateUBO) return;
+        // if (this._currentQueue.isUpdateUBO) return;
         const devicePass = this._currentQueue.devicePass;
         const rasterId = devicePass.rasterID;
         const passRenderData = context.renderGraph.getData(rasterId);
@@ -1313,9 +1313,10 @@ class DeviceRenderScene implements RecordingInterface {
         const queueId = this._currentQueue.queueId;
         const queueRenderData = context.renderGraph.getData(queueId)!;
         this._updateGlobal(queueRenderData, sceneId);
-        const sceneRenderData = context.renderGraph.getData(sceneId)!;
-        if (sceneRenderData) this._updateGlobal(sceneRenderData, sceneId);
-        this._currentQueue.isUpdateUBO = true;
+        context.passDescriptorSet?.update();
+        // const sceneRenderData = context.renderGraph.getData(sceneId)!;
+        // if (sceneRenderData) this._updateGlobal(sceneRenderData, sceneId);
+        // this._currentQueue.isUpdateUBO = true;
     }
 
     private _applyViewport (): void {
@@ -1341,7 +1342,7 @@ class DeviceRenderScene implements RecordingInterface {
     public record (): void {
         const devicePass = this._currentQueue.devicePass;
         const sceneCulling = context.culling;
-        this._updateRenderData();
+        if (!devicePass.indexOfRD) this._updateRenderData();
         this._applyViewport();
         // Currently processing blit and camera first
         if (this.blit) {
@@ -1351,9 +1352,10 @@ class DeviceRenderScene implements RecordingInterface {
         const renderQueueQuery = sceneCulling.renderQueueQueryIndex.get(this.sceneID)!;
         const renderQueue = sceneCulling.renderQueues[renderQueueQuery.renderQueueTarget];
         const graphSceneData = this.sceneData!;
-        if (bool(graphSceneData.flags & SceneFlags.REFLECTION_PROBE)) renderQueue.probeQueue.applyMacro();
+        const isProbe = bool(graphSceneData.flags & SceneFlags.REFLECTION_PROBE);
+        if (isProbe) renderQueue.probeQueue.applyMacro();
         renderQueue.recordCommands(context.commandBuffer, this._renderPass, graphSceneData.flags);
-        if (bool(graphSceneData.flags & SceneFlags.REFLECTION_PROBE)) renderQueue.probeQueue.removeMacro();
+        if (isProbe) renderQueue.probeQueue.removeMacro();
         if (graphSceneData.flags & SceneFlags.GEOMETRY) {
             this.camera!.geometryRenderer?.render(
                 devicePass.renderPass,
