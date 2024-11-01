@@ -31,6 +31,7 @@ import { RenderWindow } from '../core/render-window';
 import { GeometryRenderer } from '../../rendering/geometry-renderer';
 import { PostProcess } from '../../rendering/post-process/components/post-process';
 import type { Frustum } from '../../core/geometry';
+import type { Root } from '../../root';
 
 /**
  * @en The enumeration type for the fixed axis of the camera.
@@ -1044,7 +1045,7 @@ export class Camera {
             if (this._proj$ === CameraProjection.PERSPECTIVE) {
                 if (xr && xr.isWebXR && xr.webXRWindowMap && xr.webXRMatProjs) {
                     const wndXREye = xr.webXRWindowMap.get(this._window$);
-                    this._matProj$.set(xr.webXRMatProjs[wndXREye]);
+                    this._matProj$.set(xr.webXRMatProjs[wndXREye] as Mat4);
                 } else {
                     Mat4.perspective(
                         this._matProj$,
@@ -1144,7 +1145,8 @@ export class Camera {
      */
     public initGeometryRenderer (): void {
         if (!this._geometryRenderer$) {
-            this._geometryRenderer$ = cclegacy.internal.GeometryRenderer ? new cclegacy.internal.GeometryRenderer() : null;
+            const GeometryRenderer = cclegacy.internal.GeometryRenderer;
+            this._geometryRenderer$ = GeometryRenderer ? new GeometryRenderer() : null;
             this._geometryRenderer$?.activate(this._device$);
         }
     }
@@ -1191,7 +1193,7 @@ export class Camera {
         if (this._window$) {
             this._window$.detachCamera(this);
         }
-        const win = window || cclegacy.director.root.mainWindow;
+        const win = window || (cclegacy.director.root as Root).mainWindow;
         if (win) {
             win.attachCamera(this);
             this.window = win;

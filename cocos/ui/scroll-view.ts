@@ -78,6 +78,18 @@ const eventMap = {
     'scroll-began': 12,
 };
 
+const _moveDeltaOptions = {
+    anchor: v2(),
+    applyToHorizontal: false,
+    applyToVertical: false,
+};
+
+const assignMoveDeltaOption = (x: number, y: number, applyToHorizontal: boolean, applyToVertical: boolean): void => {
+    _moveDeltaOptions.anchor.set(x, y);
+    _moveDeltaOptions.applyToHorizontal = applyToHorizontal;
+    _moveDeltaOptions.applyToVertical = applyToVertical;
+};
+
 /**
  * @en
  * Enum for ScrollView event type.
@@ -486,11 +498,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToBottom (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, 0),
-            applyToHorizontal: false,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(0, 0, false, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -516,11 +525,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToTop (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, 1),
-            applyToHorizontal: false,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(0, 1, false, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -546,11 +552,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToLeft (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, 0),
-            applyToHorizontal: true,
-            applyToVertical: false,
-        });
+        assignMoveDeltaOption(0, 0, true, false);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -576,11 +579,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToRight (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(1, 0),
-            applyToHorizontal: true,
-            applyToVertical: false,
-        });
+        assignMoveDeltaOption(1, 0, true, false);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -606,11 +606,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToTopLeft (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, 1),
-            applyToHorizontal: true,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(0, 1, true, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -636,11 +633,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToTopRight (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(1, 1),
-            applyToHorizontal: true,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(1, 1, true, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -666,11 +660,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToBottomLeft (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, 0),
-            applyToHorizontal: true,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(0, 0, true, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -696,11 +687,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToBottomRight (timeInSecond?: number, attenuated = true): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(1, 0),
-            applyToHorizontal: true,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(1, 0, true, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -806,11 +794,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToPercentHorizontal (percent: number, timeInSecond: number, attenuated: boolean): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(percent, 0),
-            applyToHorizontal: true,
-            applyToVertical: false,
-        });
+        assignMoveDeltaOption(percent, 0, true, false);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated !== false);
@@ -842,11 +827,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollTo (anchor: Vec2, timeInSecond?: number, attenuated?: boolean): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(anchor),
-            applyToHorizontal: true,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(anchor.x, anchor.y, true, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated);
@@ -873,11 +855,8 @@ export class ScrollView extends ViewGroup {
      * ```
      */
     public scrollToPercentVertical (percent: number, timeInSecond?: number, attenuated?: boolean): void {
-        const moveDelta = this._calculateMovePercentDelta({
-            anchor: new Vec2(0, percent),
-            applyToHorizontal: false,
-            applyToVertical: true,
-        });
+        assignMoveDeltaOption(0, percent, false, true);
+        const moveDelta = this._calculateMovePercentDelta(_moveDeltaOptions);
 
         if (timeInSecond) {
             this._startAutoScroll(moveDelta, timeInSecond, attenuated);
