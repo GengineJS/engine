@@ -63,6 +63,7 @@ export class BuiltinPipelineSettings extends Component {
     onDisable(): void {
         const cameraComponent = this.getComponent(Camera)!;
         const camera = cameraComponent.camera;
+        if (!camera) { return; }
         camera.pipelineSettings = null;
 
         if (EDITOR) {
@@ -81,24 +82,6 @@ export class BuiltinPipelineSettings extends Component {
 
     get pipelineType(): PipelineType {
         return this._settings.pipelineType;
-    }
-
-    @property
-    set outputColor(value: string) {
-        this._settings.outputColor = value;
-    }
-
-    get outputColor(): string {
-        return this._settings.outputColor;
-    }
-
-    @property
-    set outputDepthStencil(value: string) {
-        this._settings.outputDepthStencil = value;
-    }
-
-    get outputDepthStencil(): string {
-        return this._settings.outputDepthStencil;
     }
 
     // Editor Preview
