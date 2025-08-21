@@ -140,7 +140,7 @@ export function getContext (canvas: HTMLCanvasElement): WebGL2RenderingContext |
 
         const webGLCtxAttribs: WebGLContextAttributes = {
             alpha: macro.ENABLE_TRANSPARENT_CANVAS,
-            antialias: EDITOR || macro.ENABLE_WEBGL_ANTIALIAS,
+            antialias: false,
             depth: true,
             stencil: true,
             premultipliedAlpha: false,
