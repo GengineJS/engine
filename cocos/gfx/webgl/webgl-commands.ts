@@ -1707,7 +1707,7 @@ export function WebGLCmdFuncBindStates (
     gpuInputAssembler: IWebGLGPUInputAssembler | null,
     gpuDescriptorSets: Readonly<IWebGLGPUDescriptorSet[]>,
     dynamicOffsets: Readonly<number[]>,
-    dynamicStates: Readonly<DynamicStates>,
+    dynamicStates: DynamicStates,
 ): void {
     const { gl } = device;
     const cache = device.stateCache;
@@ -1721,7 +1721,8 @@ export function WebGLCmdFuncBindStates (
     let glMinFilter: number;
 
     // bind pipeline
-    if (gpuPipelineState && gfxStateCache.gpuPipelineState !== gpuPipelineState) {
+    if (gpuPipelineState && gpuPipelineState.isChanged) {
+        gpuPipelineState.isChanged = false;
         gfxStateCache.gpuPipelineState = gpuPipelineState;
         gfxStateCache.glPrimitive = gpuPipelineState.glPrimitive;
 
@@ -1968,6 +1969,9 @@ export function WebGLCmdFuncBindStates (
         for (let j = 0; j < blockLen; j++) {
             const glBlock = gpuShader.glBlocks[j];
             const gpuDescriptorSet = gpuDescriptorSets[glBlock.set];
+            if (!gpuDescriptorSet.isChanged) {
+                continue;
+            }
             const descriptorIdx = gpuDescriptorSet && gpuDescriptorSet.descriptorIndices[glBlock.binding];
             const gpuDescriptor = descriptorIdx >= 0 && gpuDescriptorSet.gpuDescriptors[descriptorIdx];
             let vf32: Float32Array | null = null; let offset = 0;
@@ -2153,6 +2157,9 @@ export function WebGLCmdFuncBindStates (
         for (let i = 0; i < samplerLen; i++) {
             const glSampler = gpuShader.glSamplerTextures[i];
             const gpuDescriptorSet = gpuDescriptorSets[glSampler.set];
+            if (!gpuDescriptorSet.isChanged) {
+                continue;
+            }
             let descriptorIndex = gpuDescriptorSet && gpuDescriptorSet.descriptorIndices[glSampler.binding];
             let gpuDescriptor = descriptorIndex >= 0 && gpuDescriptorSet.gpuDescriptors[descriptorIndex];
 
@@ -2243,15 +2250,18 @@ export function WebGLCmdFuncBindStates (
                         gpuTexture.glMagFilter = gpuSampler.glMagFilter;
                     }
                 }
-
                 gpuDescriptor = gpuDescriptorSet.gpuDescriptors[++descriptorIndex];
             }
         }
+        gpuDescriptorSets.forEach((desc) => {
+            desc.isChanged = false;
+        });
     } // bind descriptor sets
 
     // bind vertex/index buffer
     if (gpuInputAssembler && gpuShader
-        && (isShaderChanged || gfxStateCache.gpuInputAssembler !== gpuInputAssembler)) {
+        && (isShaderChanged || gpuInputAssembler.isChanged)) {
+        gpuInputAssembler.isChanged = false;
         gfxStateCache.gpuInputAssembler = gpuInputAssembler;
         const ia = device.extensions.ANGLE_instanced_arrays;
 
@@ -2385,59 +2395,60 @@ export function WebGLCmdFuncBindStates (
             const dynamicState = gpuPipelineState.dynamicStates[j];
             switch (dynamicState) {
             case DynamicStateFlagBit.LINE_WIDTH: {
-                if (cache.rs.lineWidth !== dynamicStates.lineWidth) {
+                if (dynamicStates.isLWChanged) {
                     gl.lineWidth(dynamicStates.lineWidth);
                     cache.rs.lineWidth = dynamicStates.lineWidth;
+                    dynamicStates.isLWChanged = false;
                 }
                 break;
             }
             case DynamicStateFlagBit.DEPTH_BIAS: {
-                if (cache.rs.depthBias !== dynamicStates.depthBiasConstant
-                    || cache.rs.depthBiasSlop !== dynamicStates.depthBiasSlope) {
+                if (dynamicStates.isDBiasChanged) {
                     gl.polygonOffset(dynamicStates.depthBiasConstant, dynamicStates.depthBiasSlope);
                     cache.rs.depthBias = dynamicStates.depthBiasConstant;
                     cache.rs.depthBiasSlop = dynamicStates.depthBiasSlope;
+                    dynamicStates.isDBiasChanged = false;
                 }
                 break;
             }
             case DynamicStateFlagBit.BLEND_CONSTANTS: {
                 const blendConstant = dynamicStates.blendConstant;
-                if ((cacheBS.blendColor.x !== blendConstant.x)
-                    || (cacheBS.blendColor.y !== blendConstant.y)
-                    || (cacheBS.blendColor.z !== blendConstant.z)
-                    || (cacheBS.blendColor.w !== blendConstant.w)) {
+                if (dynamicStates.isDBlendChanged) {
                     gl.blendColor(blendConstant.x, blendConstant.y, blendConstant.z, blendConstant.w);
                     cacheBS.blendColor.copy(blendConstant);
+                    dynamicStates.isDBlendChanged = false;
                 }
                 break;
             }
             case DynamicStateFlagBit.STENCIL_WRITE_MASK: {
                 const front = dynamicStates.stencilStatesFront;
                 const back = dynamicStates.stencilStatesBack;
-                if (cacheDSS.stencilWriteMaskFront !== front.writeMask) {
+                if (dynamicStates.isSSWFChanged) {
                     gl.stencilMaskSeparate(WebGLConstants.FRONT, front.writeMask);
                     cacheDSS.stencilWriteMaskFront = front.writeMask;
+                    dynamicStates.isSSWFChanged = false;
                 }
-                if (cacheDSS.stencilWriteMaskBack !== back.writeMask) {
+                if (dynamicStates.isSSWBChanged) {
                     gl.stencilMaskSeparate(WebGLConstants.BACK, back.writeMask);
                     cacheDSS.stencilWriteMaskBack = back.writeMask;
+                    dynamicStates.isSSWBChanged = false;
                 }
                 break;
             }
             case DynamicStateFlagBit.STENCIL_COMPARE_MASK: {
                 const front = dynamicStates.stencilStatesFront;
                 const back = dynamicStates.stencilStatesBack;
-                if (cacheDSS.stencilRefFront !== front.reference
-                    || cacheDSS.stencilReadMaskFront !== front.compareMask) {
+                if (dynamicStates.isSSCFChanged) {
                     gl.stencilFuncSeparate(WebGLConstants.FRONT, WebGLCmpFuncs[cacheDSS.stencilFuncFront], front.reference, front.compareMask);
                     cacheDSS.stencilRefFront = front.reference;
                     cacheDSS.stencilReadMaskFront = front.compareMask;
+                    dynamicStates.isSSCFChanged = false;
                 }
-                if (cacheDSS.stencilRefBack !== back.reference
-                    || cacheDSS.stencilReadMaskBack !== back.compareMask) {
+                if (dynamicStates.isSSCBChanged) {
                     gl.stencilFuncSeparate(WebGLConstants.BACK, WebGLCmpFuncs[cacheDSS.stencilFuncBack], back.reference, back.compareMask);
                     cacheDSS.stencilRefBack = back.reference;
                     cacheDSS.stencilReadMaskBack = back.compareMask;
+                    dynamicStates.isSSCBChanged = false;
                 }
                 break;
             }

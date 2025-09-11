@@ -1990,6 +1990,16 @@ export class DynamicStencilStates {
 }
 
 export class DynamicStates {
+    public isVPChanged = false;
+    public isSCChanged = false;
+    public isLWChanged = false;
+    public isDBiasChanged = false;
+    public isDBlendChanged = false;
+    public isDBChanged = false;
+    public isSSWFChanged = false;
+    public isSSWBChanged = false;
+    public isSSCFChanged = false;
+    public isSSCBChanged = false;
     declare private _token: never; // to make sure all usages must be an instance of this exact class, not assembled from plain object
 
     constructor (

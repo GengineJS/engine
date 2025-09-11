@@ -106,6 +106,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
         const gpuPipelineState = (pipelineState as WebGLPipelineState).gpuPipelineState;
         if (gpuPipelineState !== this._curGPUPipelineState) {
             this._curGPUPipelineState = gpuPipelineState;
+            this._curGPUPipelineState.isChanged = true;
             this._isStateInvalied = true;
         }
     }
@@ -114,6 +115,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
         const gpuDescriptorSet = (descriptorSet as WebGLDescriptorSet).gpuDescriptorSet;
         if (gpuDescriptorSet !== this._curGPUDescriptorSets[set]) {
             this._curGPUDescriptorSets[set] = gpuDescriptorSet;
+            gpuDescriptorSet.isChanged = true;
             this._isStateInvalied = true;
         }
         if (dynamicOffsets) {
@@ -123,14 +125,18 @@ export class WebGLCommandBuffer extends CommandBuffer {
                 const idx = gpuPipelineLayout.dynamicOffsetOffsets[set];
                 for (let i = 0; i < dynamicOffsets.length; i++) offsets[idx + i] = dynamicOffsets[i];
                 this._isStateInvalied = true;
+                this._curGPUDescriptorSets[set].isChanged = true;
             }
         }
     }
 
     public override bindInputAssembler (inputAssembler: InputAssembler): void {
         const gpuInputAssembler = (inputAssembler as WebGLInputAssembler).getGpuInputAssembler();
-        this._curGPUInputAssembler = gpuInputAssembler;
-        this._isStateInvalied = true;
+        if (!this._curGPUInputAssembler || this._curGPUInputAssembler.hash !== gpuInputAssembler.hash) {
+            this._curGPUInputAssembler = gpuInputAssembler;
+            this._curGPUInputAssembler.isChanged = true;
+            this._isStateInvalied = true;
+        }
     }
 
     public override setViewport (viewport: Readonly<Viewport>): void {
@@ -141,6 +147,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
             || cache.height !== viewport.height
             || cache.minDepth !== viewport.minDepth
             || cache.maxDepth !== viewport.maxDepth) {
+            this._curDynamicStates.isVPChanged = true;
             cache.left = viewport.left;
             cache.top = viewport.top;
             cache.width = viewport.width;
@@ -157,6 +164,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
             || cache.y !== scissor.y
             || cache.width !== scissor.width
             || cache.height !== scissor.height) {
+            this._curDynamicStates.isSCChanged = true;
             cache.x = scissor.x;
             cache.y = scissor.y;
             cache.width = scissor.width;
@@ -168,6 +176,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
     public override setLineWidth (lineWidth: number): void {
         if (this._curDynamicStates.lineWidth !== lineWidth) {
             this._curDynamicStates.lineWidth = lineWidth;
+            this._curDynamicStates.isLWChanged = true;
             this._isStateInvalied = true;
         }
     }
@@ -180,6 +189,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
             cache.depthBiasConstant = depthBiasConstantFactor;
             cache.depthBiasClamp = depthBiasClamp;
             cache.depthBiasSlope = depthBiasSlopeFactor;
+            cache.isDBiasChanged = true;
             this._isStateInvalied = true;
         }
     }
@@ -191,6 +201,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
             || cache.z !== blendConstants.z
             || cache.w !== blendConstants.w) {
             cache.copy(blendConstants);
+            this._curDynamicStates.isDBlendChanged = true;
             this._isStateInvalied = true;
         }
     }
@@ -201,6 +212,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
             || cache.depthMaxBounds !== maxDepthBounds) {
             cache.depthMinBounds = minDepthBounds;
             cache.depthMaxBounds = maxDepthBounds;
+            cache.isDBChanged = true;
             this._isStateInvalied = true;
         }
     }
@@ -212,12 +224,14 @@ export class WebGLCommandBuffer extends CommandBuffer {
             if (front.writeMask !== writeMask) {
                 front.writeMask = writeMask;
                 this._isStateInvalied = true;
+                this._curDynamicStates.isSSWFChanged = true;
             }
         }
         if (face & StencilFace.BACK) {
             if (back.writeMask !== writeMask) {
                 back.writeMask = writeMask;
                 this._isStateInvalied = true;
+                this._curDynamicStates.isSSWBChanged = true;
             }
         }
     }
@@ -231,6 +245,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
                 front.reference = reference;
                 front.compareMask = compareMask;
                 this._isStateInvalied = true;
+                this._curDynamicStates.isSSCFChanged = true;
             }
         }
         if (face & StencilFace.BACK) {
@@ -239,6 +254,7 @@ export class WebGLCommandBuffer extends CommandBuffer {
                 back.reference = reference;
                 back.compareMask = compareMask;
                 this._isStateInvalied = true;
+                this._curDynamicStates.isSSCBChanged = true;
             }
         }
     }

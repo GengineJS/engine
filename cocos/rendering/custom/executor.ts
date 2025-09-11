@@ -1226,6 +1226,7 @@ class DeviceRenderScene implements RecordingInterface {
         const cmdBuff = context.commandBuffer;
         for (const model of blit.models) {
             for (const subModel of model.subModels) {
+                this._updateRenderData();
                 const inputAssembler = subModel.inputAssembler;
                 const passCount = subModel.passes.length;
                 for (let passId = 0; passId < passCount; ++passId) {
@@ -1263,6 +1264,7 @@ class DeviceRenderScene implements RecordingInterface {
             for (let j = 0; j < count; j++) {
                 const pass = batch.passes[j];
                 if (pass.phaseID !== this._currentQueue.phaseID) continue;
+                this._updateRenderData();
                 const shader = batch.shaders[j];
                 const ia: InputAssembler = batch.inputAssembler!;
                 const ds = batch.descriptorSet!;
@@ -1277,6 +1279,7 @@ class DeviceRenderScene implements RecordingInterface {
         if (!profiler || !profiler.enabled || !context.passShowStatistics) {
             return;
         }
+        this._updateRenderData();
         const profilerDesc = context.profilerDescriptorSet;
         const renderPass = this._renderPass;
         const cmdBuff = context.commandBuffer;
@@ -1292,7 +1295,7 @@ class DeviceRenderScene implements RecordingInterface {
     }
     private _recordBlit (): void {
         if (!this.blit) { return; }
-
+        this._updateRenderData();
         const blit = this.blit;
         const currMat = blit.material!;
         const pass = currMat.passes[blit.passID];
@@ -1354,9 +1357,7 @@ class DeviceRenderScene implements RecordingInterface {
     public record (): void {
         const devicePass = this._currentQueue.devicePass;
         const sceneCulling = context.culling;
-        this._updateRenderData();
         this._applyViewport();
-
         // Currently processing blit and camera first
         if (this.blit) {
             switch (this.blit.blitType) {
@@ -1382,14 +1383,20 @@ class DeviceRenderScene implements RecordingInterface {
         const graphSceneData = this.sceneData!;
         const isProbe = bool(graphSceneData.flags & SceneFlags.REFLECTION_PROBE);
         if (isProbe) rq.probeQueue.applyMacro();
-        rq.recordCommands(context.commandBuffer, this._renderPass, graphSceneData.flags);
+        rq.recordCommands(context.commandBuffer, this._renderPass, graphSceneData.flags, () => {
+            this._updateRenderData();
+        });
         if (isProbe) rq.probeQueue.removeMacro();
         if (graphSceneData.flags & SceneFlags.GEOMETRY) {
-            this.camera!.geometryRenderer?.render(
-                devicePass.renderPass,
-                context.commandBuffer,
-                context.pipeline.pipelineSceneData,
-            );
+            const geometryRender = this.camera!.geometryRenderer;
+            if (geometryRender) {
+                this._updateRenderData();
+                geometryRender.render(
+                    devicePass.renderPass,
+                    context.commandBuffer,
+                    context.pipeline.pipelineSceneData,
+                );
+            }
         }
     }
 }

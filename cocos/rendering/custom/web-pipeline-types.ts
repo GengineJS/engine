@@ -806,10 +806,10 @@ export class WebSetter implements Setter {
     protected _currCount;
     protected _currConstant: number[] = [];
 }
-
+type DrawCallback = () => void;
 export class RenderDrawQueue {
     instances: Array<DrawInstance> = new Array<DrawInstance>();
-
+    beforeDraw: DrawCallback | null = null;
     empty (): boolean {
         return this.instances.length === 0;
     }
@@ -873,8 +873,8 @@ export class RenderDrawQueue {
         dynamicOffsets: number[] | null = null,
     ): void {
         for (const instance of this.instances) {
+            if (this.beforeDraw) this.beforeDraw();
             const subModel = instance.subModel!;
-
             const passIdx = instance.passIndex;
             const inputAssembler = subModel.inputAssembler;
             const pass = subModel.passes[passIdx];
@@ -903,6 +903,7 @@ export class RenderDrawQueue {
 export class RenderInstancingQueue {
     passInstances: Map<Pass, number> = new Map<Pass, number>();
     instanceBuffers: Array<InstancedBuffer> = new Array<InstancedBuffer>();
+    beforeDraw: DrawCallback | null = null;
     empty (): boolean {
         return this.passInstances.size === 0;
     }
@@ -967,6 +968,7 @@ export class RenderInstancingQueue {
                 if (!instance.count) {
                     continue;
                 }
+                if (this.beforeDraw) this.beforeDraw();
                 const pso = PipelineStateManager.getOrCreatePipelineState(
                     deviceManager.gfxDevice,
                     drawPass,
@@ -1084,8 +1086,12 @@ export class RenderQueue {
         && this.transparentInstancingQueue.empty();
     }
 
-    recordCommands (cmdBuffer: CommandBuffer, renderPass: RenderPass, sceneFlags: SceneFlags): void {
+    recordCommands (cmdBuffer: CommandBuffer, renderPass: RenderPass, sceneFlags: SceneFlags, beforeDraw: DrawCallback | null = null): void {
         const offsets = this.lightByteOffset === 0xFFFFFFFF ? null : [this.lightByteOffset];
+        if (beforeDraw) {
+            this.opaqueInstancingQueue.beforeDraw = this.opaqueQueue.beforeDraw = beforeDraw;
+            this.transparentInstancingQueue.beforeDraw = this.transparentQueue.beforeDraw = beforeDraw;
+        }
         if (sceneFlags & (SceneFlags.OPAQUE | SceneFlags.MASK)) {
             this.opaqueQueue.recordCommandBuffer(deviceManager.gfxDevice, renderPass, cmdBuffer, null, 0, offsets);
             this.opaqueInstancingQueue.recordCommandBuffer(renderPass, cmdBuffer, null, 0, offsets);
