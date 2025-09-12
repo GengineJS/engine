@@ -323,6 +323,7 @@ export interface IWebGL2GPUDescriptor {
 export interface IWebGL2GPUDescriptorSet {
     gpuDescriptors: IWebGL2GPUDescriptor[];
     descriptorIndices: number[];
+    isChanged: boolean;
 }
 
 /** @mangle */
