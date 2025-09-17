@@ -2259,6 +2259,9 @@ export function WebGL2CmdFuncBindStates (
         for (let j = 0; j < blockLen; j++) {
             const glBlock = gpuShader.glBlocks[j];
             const gpuDescriptorSet = gpuDescriptorSets[glBlock.set];
+            if (gpuDescriptorSet.isChanged === false && !isShaderChanged) {
+                continue;
+            }
             const descriptorIndex = gpuDescriptorSet && gpuDescriptorSet.descriptorIndices[glBlock.binding];
             const gpuDescriptor = descriptorIndex >= 0 && gpuDescriptorSet.gpuDescriptors[descriptorIndex];
 
@@ -2294,6 +2297,9 @@ export function WebGL2CmdFuncBindStates (
         for (let i = 0; i < samplerLen; i++) {
             const glSampler = gpuShader.glSamplerTextures[i];
             const gpuDescriptorSet = gpuDescriptorSets[glSampler.set];
+            if (gpuDescriptorSet.isChanged === false) {
+                continue;
+            }
             let descriptorIndex = gpuDescriptorSet && gpuDescriptorSet.descriptorIndices[glSampler.binding];
             let gpuDescriptor = descriptorIndex >= 0 && gpuDescriptorSet.gpuDescriptors[descriptorIndex];
 
@@ -2337,6 +2343,9 @@ export function WebGL2CmdFuncBindStates (
                 gpuDescriptor = gpuDescriptorSet.gpuDescriptors[++descriptorIndex];
             }
         }
+        gpuDescriptorSets.forEach((desc) => {
+            if (desc.isChanged === true) desc.isChanged = false;
+        });
     } // bind descriptor sets
 
     // bind vertex/index buffer

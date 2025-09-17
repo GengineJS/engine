@@ -67,6 +67,7 @@ import {
     SurfaceTransform,
     Swapchain,
     Texture,
+    TextureBlit,
     TextureInfo,
     TextureType,
     TextureUsageBit,
@@ -136,9 +137,9 @@ import {
 } from './define';
 import { LightResource, SceneCulling } from './scene-culling';
 import { Pass, RenderScene } from '../../render-scene';
-import { WebProgramLibrary } from './web-program-library';
-import { recordCommand, RenderQueue as RenderExeQueue } from './web-pipeline-types';
+import { bindDescriptorSet, recordCommand, RenderQueue as RenderExeQueue } from './web-pipeline-types';
 import { SpotLight, SphereLight } from '../../render-scene/scene';
+import { WebProgramLibrary } from './web-program-library';
 
 class ResourceVisitor implements ResourceGraphVisitor {
     name: string;
@@ -540,8 +541,7 @@ class DeviceComputeQueue implements RecordingInterface {
 
     record (): void {
         if (this._descSetData && this._descSetData.descriptorSet) {
-            context.commandBuffer
-                .bindDescriptorSet(SetIndex.COUNT, this._descSetData.descriptorSet);
+            bindDescriptorSet(context.commandBuffer, SetIndex.COUNT, this._descSetData.descriptorSet);
         }
     }
 }
@@ -630,8 +630,7 @@ class DeviceRenderQueue implements RecordingInterface {
 
     record (): void {
         if (this._descSetData && this._descSetData.descriptorSet) {
-            context.commandBuffer
-                .bindDescriptorSet(SetIndex.COUNT, this._descSetData.descriptorSet);
+            bindDescriptorSet(context.commandBuffer, SetIndex.COUNT, this._descSetData.descriptorSet);
         }
         this._renderScenes.forEach((scene) => {
             scene.record();
@@ -890,6 +889,16 @@ class DeviceRenderPass implements RecordingInterface {
         }
     }
 
+    bindGlobalDesc (): void {
+        const cmdBuff = context.commandBuffer;
+        if (context.passDescriptorSet) {
+            bindDescriptorSet(
+                cmdBuff,
+                SetIndex.GLOBAL,
+                context.passDescriptorSet,
+            );
+        }
+    }
     beginPass (): void {
         const tex = this.framebuffer.colorTextures[0]!;
         this._applyViewport(tex);
@@ -1092,7 +1101,8 @@ class DeviceComputePass implements RecordingInterface {
     record (): void {
         const cmdBuff = context.commandBuffer;
         if (context.passDescriptorSet) {
-            cmdBuff.bindDescriptorSet(
+            bindDescriptorSet(
+                cmdBuff,
                 SetIndex.GLOBAL,
                 context.passDescriptorSet,
             );
@@ -1163,6 +1173,7 @@ class DeviceRenderScene implements RecordingInterface {
         const cmdBuff = context.commandBuffer;
         for (const model of blit.models) {
             for (const subModel of model.subModels) {
+                this._updateRenderData();
                 const inputAssembler = subModel.inputAssembler;
                 const passCount = subModel.passes.length;
                 for (let passId = 0; passId < passCount; ++passId) {
@@ -1176,8 +1187,8 @@ class DeviceRenderScene implements RecordingInterface {
                         inputAssembler,
                     );
                     cmdBuff.bindPipelineState(pso);
-                    cmdBuff.bindDescriptorSet(SetIndex.MATERIAL, pass.descriptorSet);
-                    cmdBuff.bindDescriptorSet(SetIndex.LOCAL, subModel.descriptorSet);
+                    bindDescriptorSet(cmdBuff, SetIndex.MATERIAL, pass.descriptorSet);
+                    bindDescriptorSet(cmdBuff, SetIndex.LOCAL, subModel.descriptorSet);
                     cmdBuff.bindInputAssembler(inputAssembler);
                     cmdBuff.draw(inputAssembler);
                 }
@@ -1200,6 +1211,7 @@ class DeviceRenderScene implements RecordingInterface {
             for (let j = 0; j < count; j++) {
                 const pass = batch.passes[j];
                 if (pass.phaseID !== this._currentQueue.phaseID) continue;
+                this._updateRenderData();
                 const shader = batch.shaders[j];
                 const ia: InputAssembler = batch.inputAssembler!;
                 const ds = batch.descriptorSet!;
@@ -1214,6 +1226,7 @@ class DeviceRenderScene implements RecordingInterface {
         if (!profiler || !profiler.enabled || !context.passShowStatistics) {
             return;
         }
+        this._updateRenderData();
         const profilerDesc = context.profilerDescriptorSet;
         const renderPass = this._renderPass;
         const cmdBuff = context.commandBuffer;
@@ -1224,12 +1237,12 @@ class DeviceRenderScene implements RecordingInterface {
         profilerViewport.height = rect.height;
         cmdBuff.setViewport(profilerViewport);
         cmdBuff.setScissor(rect);
-        cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, profilerDesc);
+        bindDescriptorSet(cmdBuff, SetIndex.GLOBAL, profilerDesc);
         recordCommand(cmdBuff, renderPass, pass, submodel.descriptorSet, submodel.shaders[0], ia);
     }
     private _recordBlit (): void {
         if (!this.blit) { return; }
-
+        this._updateRenderData();
         const blit = this.blit;
         const currMat = blit.material!;
         const pass = currMat.passes[blit.passID];
@@ -1291,9 +1304,7 @@ class DeviceRenderScene implements RecordingInterface {
     public record (): void {
         const devicePass = this._currentQueue.devicePass;
         const sceneCulling = context.culling;
-        this._updateRenderData();
         this._applyViewport();
-
         // Currently processing blit and camera first
         if (this.blit) {
             switch (this.blit.blitType) {
@@ -1319,14 +1330,20 @@ class DeviceRenderScene implements RecordingInterface {
         const graphSceneData = this.sceneData!;
         const isProbe = bool(graphSceneData.flags & SceneFlags.REFLECTION_PROBE);
         if (isProbe) rq.probeQueue.applyMacro();
-        rq.recordCommands(context.commandBuffer, this._renderPass, graphSceneData.flags);
+        rq.recordCommands(context.commandBuffer, this._renderPass, graphSceneData.flags, () => {
+            this._updateRenderData();
+        });
         if (isProbe) rq.probeQueue.removeMacro();
         if (graphSceneData.flags & SceneFlags.GEOMETRY) {
-            this.camera!.geometryRenderer?.render(
-                devicePass.renderPass,
-                context.commandBuffer,
-                context.pipeline.pipelineSceneData,
-            );
+            const geometryRender = this.camera!.geometryRenderer;
+            if (geometryRender) {
+                this._updateRenderData();
+                geometryRender.render(
+                    devicePass.renderPass,
+                    context.commandBuffer,
+                    context.pipeline.pipelineSceneData,
+                );
+            }
         }
     }
 }
@@ -1611,7 +1628,7 @@ export class Executor {
             width,
             height,
         );
-        const programLib: WebProgramLibrary = cclegacy.rendering.programLib;
+        const programLib = cclegacy.rendering.programLib as WebProgramLibrary;
         context.lightResource.init(programLib, device, 16);
     }
 
@@ -1855,7 +1872,7 @@ class PreRenderVisitor extends BaseRenderVisitor implements RenderGraphVisitor {
             cmdBuff.bindPipelineState(pso);
             const layoutStage = devicePass.renderLayout;
             const layoutDesc = layoutStage!.descriptorSet!;
-            cmdBuff.bindDescriptorSet(SetIndex.GLOBAL, layoutDesc);
+            bindDescriptorSet(cmdBuff, SetIndex.GLOBAL, layoutDesc);
         }
 
         const gx = value.threadGroupCountX;
