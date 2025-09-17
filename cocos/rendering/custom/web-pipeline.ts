@@ -181,6 +181,7 @@ function getResourceDimension (type: TextureType): ResourceDimension {
 
 const emptyMaterial = new Material();
 const emptyRenderData = new RenderData();
+const renderDataMap: Map<string, RenderData> = new Map<string, RenderData>();
 export class WebSceneBuilder extends WebSetter implements SceneBuilder {
     constructor (
         data: RenderData,
@@ -270,15 +271,22 @@ export class WebRenderQueueBuilder extends WebSetter implements RenderQueueBuild
         const sceneId = this._renderGraph.addVertex<RenderGraphValue.Scene>(RenderGraphValue.Scene, sceneData, 'Scene', '', renderData, !DEBUG, this._vertID);
         if (!(sceneFlags & SceneFlags.NON_BUILTIN)) {
             const layoutName = this.getParentLayout();
-            setCameraUBOValues(
-                this,
-                camera,
-                this._pipeline,
-                scene || camera.scene,
-                layoutName,
-            );
-            if (light && light.type !== LightType.DIRECTIONAL) setShadowUBOLightView(this, camera, light, 0, layoutName);
-            else if (!(sceneFlags & SceneFlags.SHADOW_CASTER)) setShadowUBOView(this, camera, layoutName);
+            const isNotDir = light  && light.type !== LightType.DIRECTIONAL;
+            const key =  `${camera.cameraId}_${layoutName}${isNotDir ? `_${light.lightId}` : ''}`;
+            if (!renderDataMap.has(key)) {
+                renderDataMap.set(key, this.data);
+                setCameraUBOValues(
+                    this,
+                    camera,
+                    this._pipeline,
+                    scene || camera.scene,
+                    layoutName,
+                );
+                if (isNotDir) setShadowUBOLightView(this, camera, light, 0, layoutName);
+                else if (!(sceneFlags & SceneFlags.SHADOW_CASTER)) setShadowUBOView(this, camera, layoutName);
+            } else {
+                this._data = renderDataMap.get(key)!;
+            }
         }
         const passOrSubpassId = this._renderGraph.getParent(this._vertID);
         if (sceneFlags & SceneFlags.UI) {
@@ -1598,7 +1606,18 @@ export class WebPipeline extends WebSetter implements BasicPipeline {
         // noop
     }
     endFrame (): void {
+        renderDataMap.clear();
         this.renderGraph?.clear();
+    }
+
+    private _generateHashAndMerge (): void {
+        let idx = 0;
+        this._renderGraph!.x.forEach((vert) => {
+            if (vert.t === RenderGraphValue.RasterPass) {
+                genHashValue(vert.j as RasterPass, this._renderGraph!, idx);
+            }
+            idx++;
+        });
     }
 
     compile (): void {
@@ -1610,12 +1629,9 @@ export class WebPipeline extends WebSetter implements BasicPipeline {
                 this._compiler = new Compiler(this, this._renderGraph, this._resourceGraph, this._lg);
             }
             this._compiler.compile(this._renderGraph);
+            this._generateHashAndMerge();
         } else {
-            this._renderGraph.x.forEach((vert) => {
-                if (vert.t === RenderGraphValue.RasterPass) {
-                    genHashValue(vert.j as RasterPass);
-                }
-            });
+            this._generateHashAndMerge();
         }
     }
 
@@ -1700,8 +1716,14 @@ export class WebPipeline extends WebSetter implements BasicPipeline {
         const vertID = this._renderGraph!.addVertex<RenderGraphValue.RasterPass>(RenderGraphValue.RasterPass, pass, name, layoutName, data, !DEBUG);
         const result = pipelinePool.renderPassBuilder.add();
         result.update(data, this._renderGraph!, this._lg, this._resourceGraph, vertID, pass, this._pipelineSceneData);
-        this._updateRasterPassConstants(result, width, height, layoutName);
-        setTextureUBOView(result, this._pipelineSceneData);
+        const key = `${layoutName}${width}${height}`;
+        if (!renderDataMap.has(key)) {
+            renderDataMap.set(key, data);
+            this._updateRasterPassConstants(result, width, height, layoutName);
+            setTextureUBOView(result, this._pipelineSceneData);
+        } else {
+            result.data = renderDataMap.get(key)!;
+        }
         return result;
     }
     addRenderPass (width: number, height: number, layoutName = 'default'): BasicRenderPassBuilder {
